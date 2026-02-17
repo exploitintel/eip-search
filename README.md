@@ -2,7 +2,7 @@
 
 A modern **searchsploit replacement** powered by the [Exploit Intelligence Platform](https://exploit-intel.com).
 
-Search 335K+ vulnerabilities and 164K+ exploits from 6 sources with risk intelligence, exploit quality ranking, Nuclei scanner integration, and trojan warnings — all from your terminal.
+Search 370K+ vulnerabilities and 105K+ exploits from 4 sources with risk intelligence, exploit quality ranking, Nuclei scanner integration, and trojan warnings — all from your terminal.
 
 ## Why eip-search?
 
@@ -11,7 +11,7 @@ Search 335K+ vulnerabilities and 164K+ exploits from 6 sources with risk intelli
 **eip-search** combines data from NVD, CISA KEV, EPSS, ExploitDB, Metasploit, GitHub, and nomi-sec into a single tool that answers questions searchsploit never could:
 
 - "What critical Fortinet vulns are being actively exploited right now?"
-- "Which of these 487 BlueKeep exploits is actually reliable — and which one is a trojan?"
+- "Which of these 127 BlueKeep exploits is actually reliable — and which one is a trojan?"
 - "Give me the Shodan dork to find exposed TeamCity instances for CVE-2024-27198"
 
 ## Installation
@@ -20,6 +20,25 @@ Search 335K+ vulnerabilities and 164K+ exploits from 6 sources with risk intelli
 
 - **Python 3.10 or newer** (check with `python3 --version` or `python --version`)
 - **pip** (comes with Python on most systems)
+
+### macOS
+
+```bash
+# Install Python 3 via Homebrew (if not already installed)
+brew install python3
+
+# Option 1: Virtual environment (recommended)
+python3 -m venv ~/.venvs/eip
+source ~/.venvs/eip/bin/activate
+pip install eip-search
+
+# Option 2: pipx (isolated, no venv activation needed)
+brew install pipx
+pipx install eip-search
+
+# The 'eip-search' command is now available
+eip-search --version
+```
 
 ### Kali Linux / Debian / Ubuntu
 
@@ -41,25 +60,6 @@ eip-search --version
 ```
 
 > **Kali users**: If you see `error: externally-managed-environment`, use one of the virtual environment methods above. Kali 2024+ enforces PEP 668 which blocks global pip installs.
-
-### macOS
-
-```bash
-# Install Python 3 via Homebrew (if not already installed)
-brew install python3
-
-# Option 1: Virtual environment
-python3 -m venv ~/.venvs/eip
-source ~/.venvs/eip/bin/activate
-pip install eip-search
-
-# Option 2: pipx
-brew install pipx
-pipx install eip-search
-
-# The 'eip-search' command is now available
-eip-search --version
-```
 
 ### Windows
 
@@ -91,7 +91,7 @@ pipx install eip-search
 ### From Source (all platforms)
 
 ```bash
-git clone https://github.com/exploit-intel/eip-search.git
+git clone git@github.com:exploit-intel/eip-search.git
 cd eip-search
 python3 -m venv .venv
 source .venv/bin/activate      # Linux/macOS
@@ -101,7 +101,7 @@ pip install -e .
 
 ### Shell Completion (optional)
 
-Enable tab completion for your shell:
+Enable tab completion for your shell (run from an interactive terminal):
 
 ```bash
 # Bash
@@ -213,7 +213,7 @@ Exploits are **grouped by quality** (Metasploit modules first, then verified Exp
 
 ## Trojan Detection
 
-BlueKeep (CVE-2019-0708) has 487 exploits. One of them is a trojan. eip-search warns you:
+BlueKeep (CVE-2019-0708) has 127 exploits. One of them is a trojan. eip-search warns you:
 
 ```
 $ eip-search info CVE-2019-0708
@@ -225,7 +225,7 @@ $ eip-search info CVE-2019-0708
   CVE-2019-0708 BlueKeep RDP Remote Windows Kernel Use After Free
   CVSS: 9.8  EPSS: 94.5%  (100.0th percentile)
 
-  Exploits (487)
+  Exploits (127)
 
     MODULES
              metasploit  ruby      cve_2019_0708_bluekeep_rce.rb
@@ -239,8 +239,8 @@ $ eip-search info CVE-2019-0708
 
     PROOF OF CONCEPT
       ★ 1187  nomisec               Ekultek/BlueKeep
-      ★ 914   nomisec               robertdavidgraham/rdpscan
       ★ 497   nomisec               n1xbyte/CVE-2019-0708
+      ★ 389   nomisec               k8gege/CVE-2019-0708
       ...
     ... and 113 more PoCs (use --all to show)
 
@@ -266,13 +266,13 @@ Filters: vendor=fortinet, severity=critical, EPSS>=0.5
 ┏━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━┳━━━━━━┳━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃CVE              ┃    Sev     ┃  CVSS ┃   EPSS ┃  Exp ┃     ┃ Title                        ┃
 ┡━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━╇━━━━━━╇━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│CVE-2018-13379   │  CRITICAL  │   9.1 │  94.5% │   58 │ KEV │ Fortinet FortiProxy Path …   │
-│CVE-2022-40684   │  CRITICAL  │   9.8 │  94.4% │   64 │ KEV │ Fortinet FortiProxy Auth …   │
-│CVE-2023-48788   │  CRITICAL  │   9.8 │  94.2% │    9 │ KEV │ Fortinet FortiClient SQL …   │
-│CVE-2024-55591   │  CRITICAL  │   9.8 │  94.2% │   17 │ KEV │ Fortinet FortiProxy Auth …   │
-│CVE-2022-42475   │  CRITICAL  │   9.8 │  94.0% │   24 │ KEV │ Fortinet FortiOS Buffer …    │
+│CVE-2018-13379   │  CRITICAL  │   9.1 │  94.5% │   14 │ KEV │ Fortinet FortiProxy Path …   │
+│CVE-2022-40684   │  CRITICAL  │   9.8 │  94.4% │   30 │ KEV │ Fortinet FortiProxy Auth …   │
+│CVE-2023-48788   │  CRITICAL  │   9.8 │  94.2% │    1 │ KEV │ Fortinet FortiClient SQL …   │
+│CVE-2024-55591   │  CRITICAL  │   9.8 │  94.2% │    8 │ KEV │ Fortinet FortiProxy Auth …   │
+│CVE-2022-42475   │  CRITICAL  │   9.8 │  94.0% │    7 │ KEV │ Fortinet FortiOS Buffer …    │
 └─────────────────┴────────────┴───────┴────────┴──────┴─────┴──────────────────────────────┘
-Page 1/4 (19 total results)
+Page 1/1 (17 total results)
 ```
 
 Triage defaults to showing vulnerabilities with public exploits and EPSS >= 0.5, sorted by exploitation probability. Every result here is confirmed actively exploited (KEV), has dozens of public exploits, and has a >94% chance of being exploited in the wild.
@@ -390,7 +390,7 @@ $ eip-search search --cwe 89 --has-exploits --sort cvss_desc -n 5
 │CVE-2025-52694   │  CRITICAL  │  10.0 │   9.7% │    1 │     │ Advantech IoT Edge SQL In…   │
 │CVE-2024-43918   │  CRITICAL  │  10.0 │  48.9% │    1 │     │ Woobewoo Product Table SQ…   │
 └─────────────────┴────────────┴───────┴────────┴──────┴─────┴──────────────────────────────┘
-Page 1/1515 (7,574 total results)
+Page 1/817 (4,082 total results)
 ```
 
 ## JSON Output for Scripting
@@ -440,21 +440,21 @@ $ eip-search stats
 ╰───────────────────────────────╯
 
   ┌──────────────────────────────┬─────────────────────┐
-  │ Total Vulnerabilities        │             335,611 │
-  │ Published                    │             191,235 │
-  │ With CVSS Scores             │             238,491 │
-  │ With EPSS Scores             │             315,597 │
-  │ Critical Severity            │              29,129 │
-  │ CISA KEV Entries             │               1,518 │
+  │ Total Vulnerabilities        │             370,791 │
+  │ Published                    │             191,380 │
+  │ With CVSS Scores             │             238,607 │
+  │ With EPSS Scores             │             315,656 │
+  │ Critical Severity            │              29,145 │
+  │ CISA KEV Entries             │               1,522 │
   │                              │                     │
-  │ Vulns with Exploits          │              83,413 │
-  │ Total Exploits               │             164,238 │
-  │ With Nuclei Templates        │                 402 │
+  │ Vulns with Exploits          │              90,481 │
+  │ Total Exploits               │             105,731 │
+  │ With Nuclei Templates        │                 404 │
   │                              │                     │
-  │ Vendors Tracked              │              37,500 │
-  │ Exploit Authors              │              23,076 │
+  │ Vendors Tracked              │              37,508 │
+  │ Exploit Authors              │              23,281 │
   │                              │                     │
-  │ Last Updated                 │ 2026-02-17 12:06:03 │
+  │ Last Updated                 │ 2026-02-17 23:07:26 │
   └──────────────────────────────┴─────────────────────┘
 ```
 
@@ -505,7 +505,7 @@ When a CVE has dozens or hundreds of exploits, eip-search ranks them by quality 
 
 On top of the base score, LLM classification modifiers apply: `working_poc` gets +100, `scanner` gets +50, while `trojan` gets -9999 (always last, with a warning).
 
-Trickest entries are hidden by default because they account for 60-80% of exploit counts but carry zero quality signals. Use `--all` to see everything.
+Exploit sources are ExploitDB (~88K), nomi-sec (~11K), Metasploit (~3.3K), and GitHub (~2.2K).
 
 ## Configuration
 
