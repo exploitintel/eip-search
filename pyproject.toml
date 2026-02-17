@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eip-search"
+version = "0.1.0"
+description = "CLI intelligence tool for the Exploit Intelligence Platform — a modern searchsploit replacement"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Exploit Intelligence Platform"}]
+keywords = ["security", "exploits", "vulnerability", "cve", "searchsploit", "pentesting"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Information Technology",
+    "Topic :: Security",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "typer[all]>=0.9.0",
+    "rich>=13.0.0",
+    "httpx>=0.27.0",
+]
+
+[project.scripts]
+eip-search = "eip_search.cli:app"
+
+[project.urls]
+Homepage = "https://exploit-intel.com"
+Repository = "https://github.com/exploit-intel/eip-search"
+
+[tool.setuptools.packages.find]
+include = ["eip_search*"]
