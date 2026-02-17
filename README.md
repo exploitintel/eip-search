@@ -8,7 +8,7 @@ Search 335K+ vulnerabilities and 164K+ exploits from 6 sources with risk intelli
 
 **searchsploit** is grep over a CSV. It can tell you an exploit exists, but nothing about how dangerous the vulnerability is, how reliable the exploit is, or whether it's secretly a trojan.
 
-**eip-search** combines data from NVD, CISA KEV, EPSS, ExploitDB, Metasploit, GitHub, nomi-sec, trickest, and GHSA into a single tool that answers questions searchsploit never could:
+**eip-search** combines data from NVD, CISA KEV, EPSS, ExploitDB, Metasploit, GitHub, and nomi-sec into a single tool that answers questions searchsploit never could:
 
 - "What critical Fortinet vulns are being actively exploited right now?"
 - "Which of these 487 BlueKeep exploits is actually reliable — and which one is a trojan?"
@@ -209,7 +209,7 @@ $ eip-search CVE-2024-3400
     ...
 ```
 
-Exploits are **grouped by quality** (Metasploit modules first, then verified ExploitDB, then GitHub PoCs ranked by stars) and **ranked by a composite score**. Low-quality trickest entries (often 60-80% of results) are hidden by default.
+Exploits are **grouped by quality** (Metasploit modules first, then verified ExploitDB, then GitHub PoCs ranked by stars) and **ranked by a composite score**.
 
 ## Trojan Detection
 
@@ -248,10 +248,9 @@ $ eip-search info CVE-2019-0708
       ★ 2     nomisec               ttsite/CVE-2019-0708-
              ⚠ TROJAN — flagged by AI analysis
 
-    + 360 more from trickest (use --all to show)
 ```
 
-The Metasploit modules and verified ExploitDB entry surface to the top. The trojan sinks to the bottom with a clear warning. The 360 trickest noise entries are hidden unless you ask for them with `--all`.
+The Metasploit modules and verified ExploitDB entry surface to the top. The trojan sinks to the bottom with a clear warning.
 
 ## Risk-Based Triage
 
@@ -503,7 +502,6 @@ When a CVE has dozens or hundreds of exploits, eip-search ranks them by quality 
 | ExploitDB (verified) | 550 | Human-verified by Offsec |
 | ExploitDB (unverified) | 300 | Published but not verified |
 | nomi-sec / GitHub | log10(stars) * 100 + bonus | Community signal via GitHub stars |
-| trickest | 10 | Bulk-scraped, often links to unrelated repos |
 
 On top of the base score, LLM classification modifiers apply: `working_poc` gets +100, `scanner` gets +50, while `trojan` gets -9999 (always last, with a warning).
 

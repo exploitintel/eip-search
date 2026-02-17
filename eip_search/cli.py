@@ -215,7 +215,7 @@ def _do_search(*, q, severity, has_exploits, kev, has_nuclei, vendor, product,
 @_app.command()
 def info(
     vuln_id: str = typer.Argument(..., help="CVE-ID (e.g. CVE-2024-3400) or EIP-ID"),
-    show_all: bool = typer.Option(False, "--all", "-a", help="Show all exploits including trickest"),
+    show_all: bool = typer.Option(False, "--all", "-a", help="Show all exploits including low-quality sources"),
     output_json: bool = typer.Option(False, "--json", "-j", help="Output raw JSON"),
 ) -> None:
     """Show full intelligence brief for a vulnerability."""

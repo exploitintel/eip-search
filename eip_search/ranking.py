@@ -62,7 +62,7 @@ def rank_exploit(exploit: Exploit) -> float:
     elif source == "github":
         base = math.log10(stars + 1) * 100 + 50
     else:
-        # trickest, ghsa, writeup, unknown
+        # ghsa, writeup, unknown
         base = 10.0
 
     # --- LLM classification modifier ---
@@ -96,7 +96,6 @@ class ExploitGroups:
     verified: list[Exploit] = field(default_factory=list)      # exploitdb verified
     pocs: list[Exploit] = field(default_factory=list)          # github, nomisec, exploitdb unverified
     suspicious: list[Exploit] = field(default_factory=list)    # trojan/suspicious
-    trickest_count: int = 0                                     # hidden by default
     other_hidden: int = 0                                       # remaining low-quality
 
     @property
@@ -105,7 +104,7 @@ class ExploitGroups:
 
     @property
     def total_count(self) -> int:
-        return self.visible_count + self.trickest_count + self.other_hidden
+        return self.visible_count + self.other_hidden
 
 
 def group_exploits(
@@ -116,22 +115,20 @@ def group_exploits(
 ) -> ExploitGroups:
     """Group and rank exploits into display categories.
 
-    By default, trickest entries are counted but hidden, and PoCs are
-    capped at *poc_limit*.  Pass ``show_all=True`` to include everything.
+    By default, PoCs are capped at *poc_limit*.  Pass ``show_all=True``
+    to include everything.
     """
     groups = ExploitGroups()
 
-    # First: separate suspicious and trickest
+    # First: separate suspicious
     remaining: list[Exploit] = []
     for e in exploits:
         if e.is_suspicious:
             groups.suspicious.append(e)
-        elif e.source == "trickest" and not show_all:
-            groups.trickest_count += 1
         else:
             remaining.append(e)
 
-    # Rank the non-suspicious, non-trickest exploits
+    # Rank the non-suspicious exploits
     ranked = rank_exploits(remaining)
 
     # Distribute into groups
@@ -141,9 +138,6 @@ def group_exploits(
             groups.modules.append(e)
         elif e.source == "exploitdb" and e.verified:
             groups.verified.append(e)
-        elif e.source == "trickest":
-            # show_all=True case: trickest still goes into pocs
-            poc_candidates.append(e)
         else:
             poc_candidates.append(e)
 

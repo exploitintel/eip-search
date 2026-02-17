@@ -278,11 +278,6 @@ def _print_exploit_groups(groups: ExploitGroups) -> None:
         for e in groups.suspicious:
             _print_exploit_line(e, indent=6, suspicious=True)
 
-    if groups.trickest_count > 0:
-        console.print(
-            f"\n    [dim]+ {groups.trickest_count} more from trickest "
-            f"(use --all to show)[/dim]"
-        )
 
 
 def _print_exploit_line(exploit: Exploit, *, indent: int = 4, suspicious: bool = False) -> None:
@@ -304,7 +299,7 @@ def _print_exploit_line(exploit: Exploit, *, indent: int = 4, suspicious: bool =
         "exploitdb": "bold green",
         "nomisec": "cyan",
         "github": "cyan",
-        "trickest": "dim",
+        "writeup": "dim",
         "ghsa": "blue",
     }
     line.append(f"{exploit.source:<12}", style=src_styles.get(exploit.source, "dim"))
