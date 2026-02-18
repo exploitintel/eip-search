@@ -1,5 +1,16 @@
 # eip-search
 
+<p align="center">
+  <img src="https://exploit-intel.com/static/brand/mark-cyan.svg" width="160" alt="Exploit Intel Platform (EIP)" />
+</p>
+
+<p align="center">
+  <img src="https://exploit-intel.com/static/brand/mark-cyan.svg" width="64" alt="EIP cyan mark" />
+  <img src="https://exploit-intel.com/static/brand/mark-amber.svg" width="64" alt="EIP amber mark" />
+  <img src="https://exploit-intel.com/static/brand/mark-green.svg" width="64" alt="EIP green mark" />
+  <img src="https://exploit-intel.com/static/brand/mark-light.svg" width="64" alt="EIP light-warm mark" />
+</p>
+
 A modern **searchsploit replacement** powered by the [Exploit Intelligence Platform](https://exploit-intel.com).
 
 Search 370K+ vulnerabilities and 105K+ exploits from 4 sources with risk intelligence, exploit quality ranking, Nuclei scanner integration, and trojan warnings — all from your terminal.
