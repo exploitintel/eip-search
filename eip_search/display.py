@@ -526,4 +526,4 @@ def _human_size(size: int) -> str:
 
 def print_error(message: str) -> None:
     """Print an error message."""
-    console.print(f"\n[bold red]Error:[/bold red] {message}\n")
+    console.print(f"\n[bold red]Error:[/bold red] {escape(message)}\n")

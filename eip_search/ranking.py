@@ -81,7 +81,8 @@ def rank_exploits(exploits: list[Exploit]) -> list[Exploit]:
     """Rank a list of exploits in-place and return sorted (best first)."""
     for e in exploits:
         e.rank_score = rank_exploit(e)
-    return sorted(exploits, key=lambda e: e.rank_score, reverse=True)
+    exploits.sort(key=lambda e: e.rank_score, reverse=True)
+    return exploits
 
 
 # ---------------------------------------------------------------------------

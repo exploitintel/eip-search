@@ -20,8 +20,7 @@ endif
 		(echo "ERROR: VERSION must be semver (e.g. 0.2.0), got: $(VERSION)" && exit 1)
 	@# Bump version in both files
 	@echo "--- Bumping version to $(VERSION)"
-	sed -i '' 's/^version = ".*"/version = "$(VERSION)"/' pyproject.toml
-	sed -i '' 's/^__version__ = ".*"/__version__ = "$(VERSION)"/' eip_search/__init__.py
+	python scripts/bump_version.py $(VERSION)
 	@# Clean, build, check, upload
 	$(MAKE) clean
 	$(MAKE) build

@@ -343,11 +343,36 @@ def download(
         extract_dir = dest / out_path.stem
         try:
             with zipfile.ZipFile(out_path, "r") as zf:
+                # Create destination directory before validation/extraction
+                extract_dir.mkdir(parents=True, exist_ok=True)
+
+                # Basic zip-bomb limits (exploit archives should be small)
+                infos = zf.infolist()
+                max_files = 5000
+                max_total_uncompressed = 250 * 1024 * 1024  # 250 MB
+
+                if len(infos) > max_files:
+                    from eip_search.display import print_error
+                    print_error(f"Archive contains too many files ({len(infos)} > {max_files}) — aborting")
+                    raise typer.Exit(1)
+
+                total_uncompressed = sum(i.file_size for i in infos)
+                if total_uncompressed > max_total_uncompressed:
+                    from eip_search.display import print_error
+                    print_error(
+                        f"Archive expands to {total_uncompressed / (1024*1024):.1f} MB "
+                        f"({max_total_uncompressed / (1024*1024):.0f} MB limit) — aborting"
+                    )
+                    raise typer.Exit(1)
+
                 # Validate all paths BEFORE extracting (prevent zip-slip attacks)
                 resolved_target = extract_dir.resolve()
-                for member in zf.namelist():
+                for info in infos:
+                    member = info.filename
                     member_path = (extract_dir / member).resolve()
-                    if not str(member_path).startswith(str(resolved_target)):
+                    try:
+                        member_path.relative_to(resolved_target)
+                    except ValueError:
                         from eip_search.display import print_error
                         print_error(f"Blocked zip-slip path traversal: {member}")
                         raise typer.Exit(1)

@@ -43,17 +43,60 @@ def _build_headers() -> dict[str, str]:
     return headers
 
 
+def _maybe_json(resp: httpx.Response) -> dict[str, Any]:
+    """Best-effort JSON parsing.
+
+    Returns an empty dict if the response isn't JSON or can't be parsed.
+    """
+    ctype = resp.headers.get("content-type", "")
+    if not ctype.startswith("application/json"):
+        return {}
+
+    try:
+        data = resp.json()
+    except ValueError:
+        return {}
+
+    if isinstance(data, dict):
+        return data
+    # Keep the public contract of _handle_response() returning a dict
+    return {"data": data}
+
+
 def _handle_response(resp: httpx.Response) -> dict[str, Any]:
     """Check response status and return parsed JSON."""
+    data = _maybe_json(resp)
+
     if resp.status_code == 404:
-        data = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
         raise APIError(404, data.get("message", "Not found"))
+
     if resp.status_code == 429:
-        retry_after = int(resp.headers.get("Retry-After", "60"))
-        raise APIError(429, f"Rate limited. Try again in {retry_after}s.", retry_after=retry_after)
+        retry_after_raw = resp.headers.get("Retry-After", "")
+        retry_after = 60
+        try:
+            if retry_after_raw:
+                retry_after = int(retry_after_raw)
+        except ValueError:
+            retry_after = 60
+
+        message = data.get("message") or f"Rate limited. Try again in {retry_after}s."
+        raise APIError(429, message, retry_after=retry_after)
+
     if resp.status_code >= 400:
-        raise APIError(resp.status_code, f"API error: HTTP {resp.status_code}")
-    return resp.json()
+        message = data.get("message") or data.get("detail") or f"API error: HTTP {resp.status_code}"
+        raise APIError(resp.status_code, message)
+
+    # Success: expect JSON
+    if not data:
+        try:
+            parsed = resp.json()
+        except ValueError as exc:
+            raise APIError(resp.status_code, "Invalid JSON response from API") from exc
+        if isinstance(parsed, dict):
+            return parsed
+        return {"data": parsed}
+
+    return data
 
 
 def _api_url(path: str) -> str:
