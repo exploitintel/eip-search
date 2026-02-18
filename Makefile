@@ -1,4 +1,4 @@
-.PHONY: release build clean check
+.PHONY: release build clean check deb
 
 # ── Release a new version to PyPI ─────────────────────────────────────────────
 #   make release VERSION=0.2.0
@@ -53,3 +53,8 @@ clean:
 check:
 	@echo "--- Checking package"
 	twine check dist/*
+
+# ── Build .deb package (requires Docker) ─────────────────────────────────────
+deb:
+	@echo "--- Building .deb package"
+	packaging/deb/build.sh
