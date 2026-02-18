@@ -1,4 +1,7 @@
-FROM ubuntu:22.04
+ARG BASE_IMAGE=ubuntu:22.04
+FROM ${BASE_IMAGE}
+
+ARG DISTRO_TAG
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -15,8 +18,10 @@ COPY pyproject.toml LICENSE README.md ./
 COPY eip_search/ eip_search/
 COPY packaging/deb/preinst.sh /scripts/preinst.sh
 COPY packaging/deb/postrm.sh /scripts/postrm.sh
-RUN python3 -m pip install --no-cache-dir build \
-    && python3 -m build --wheel
+RUN python3 -m venv /tmp/buildenv \
+    && /tmp/buildenv/bin/pip install --no-cache-dir build \
+    && /tmp/buildenv/bin/python -m build --wheel \
+    && rm -rf /tmp/buildenv
 
 # Install into the target venv location
 RUN python3 -m venv /opt/eip-search \
@@ -35,13 +40,14 @@ RUN mkdir -p /usr/local/bin \
 # Build .deb
 ARG VERSION
 RUN test -n "$VERSION" || { echo "ERROR: --build-arg VERSION is required"; exit 1; }
+RUN test -n "$DISTRO_TAG" || { echo "ERROR: --build-arg DISTRO_TAG is required"; exit 1; }
 
 RUN mkdir /out && fpm \
     -s dir \
     -t deb \
     -n eip-search \
     -v "${VERSION}" \
-    -a amd64 \
+    -a all \
     --description "CLI intelligence tool for the Exploit Intelligence Platform — a modern searchsploit replacement" \
     --url "https://github.com/exploit-intel/eip-search" \
     --license "MIT" \
@@ -52,7 +58,7 @@ RUN mkdir /out && fpm \
     --deb-no-default-config-files \
     --before-install /scripts/preinst.sh \
     --after-remove /scripts/postrm.sh \
-    -p "/out/eip-search_${VERSION}_amd64.deb" \
+    -p "/out/eip-search_${VERSION}_${DISTRO_TAG}_all.deb" \
     -C / \
     opt/eip-search \
     usr/local/bin/eip-search

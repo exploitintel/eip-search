@@ -118,6 +118,64 @@ source .venv/bin/activate      # Linux/macOS
 pip install -e .
 ```
 
+## Building Packages
+
+### Build Dependencies
+
+| Target | Requirements |
+|---|---|
+| `make build` | Python 3, `build` module (`pip install build`) |
+| `make check` / `make pypi` | `twine` (`pip install twine`) |
+| `make deb` | Docker |
+| `make release` | All of the above + `gh` CLI ([cli.github.com](https://cli.github.com)) |
+
+Install everything at once:
+
+```bash
+pip install build twine
+# Docker: https://docs.docker.com/get-docker/
+# gh CLI: https://cli.github.com
+```
+
+The Makefile checks for each dependency before running and will tell you exactly what's missing.
+
+### PyPI (wheel + sdist)
+
+```bash
+make build          # build dist/*.whl and dist/*.tar.gz
+make check          # validate with twine
+make pypi           # upload to PyPI
+```
+
+### .deb Packages
+
+Build for a single distro or all four supported targets:
+
+```bash
+make deb DISTRO=ubuntu-jammy      # Ubuntu 22.04
+make deb DISTRO=ubuntu-noble      # Ubuntu 24.04
+make deb DISTRO=debian-bookworm   # Debian 12
+make deb DISTRO=kali              # Kali Rolling
+make deb                          # all four
+```
+
+Output lands in `dist/`:
+
+```
+dist/eip-search_0.2.0_ubuntu-jammy_all.deb
+dist/eip-search_0.2.0_ubuntu-noble_all.deb
+dist/eip-search_0.2.0_debian-bookworm_all.deb
+dist/eip-search_0.2.0_kali-rolling_all.deb
+```
+
+### Full Release
+
+Bumps version, builds PyPI + all `.deb`s, uploads to PyPI, commits, tags, pushes, and creates a GitHub release with `.deb`s attached:
+
+```bash
+make release VERSION=0.2.0
+```
+
 ### Shell Completion (optional)
 
 Enable tab completion for your shell (run from an interactive terminal):
