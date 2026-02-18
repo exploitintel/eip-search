@@ -267,6 +267,62 @@ class SearchResult:
 
 
 @dataclass
+class ExploitWithCVE(Exploit):
+    """An exploit with parent CVE context, returned by the exploit browse API."""
+
+    cve_id: str | None = None
+    cve_title: str | None = None
+    severity_label: str | None = None
+    cvss_v3_score: float | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict) -> ExploitWithCVE:
+        return cls(
+            id=data.get("id", 0),
+            source=data.get("source", ""),
+            source_url=data.get("source_url"),
+            source_id=data.get("source_id"),
+            language=data.get("language"),
+            exploit_type=data.get("exploit_type"),
+            quality_tier=data.get("quality_tier"),
+            verified=data.get("verified"),
+            author_name=data.get("author_name"),
+            platform=data.get("platform"),
+            exploit_rank=data.get("exploit_rank"),
+            github_stars=data.get("github_stars"),
+            github_forks=data.get("github_forks"),
+            has_code=data.get("has_code", False),
+            llm_classification=data.get("llm_classification"),
+            description=data.get("description"),
+            cve_id=data.get("cve_id"),
+            cve_title=data.get("cve_title"),
+            severity_label=data.get("severity_label"),
+            cvss_v3_score=data.get("cvss_v3_score"),
+        )
+
+
+@dataclass
+class ExploitBrowseResult:
+    """Paginated exploit browse result set."""
+
+    total: int
+    page: int
+    per_page: int
+    total_pages: int
+    items: list[ExploitWithCVE]
+
+    @classmethod
+    def from_dict(cls, data: dict) -> ExploitBrowseResult:
+        return cls(
+            total=data.get("total", 0),
+            page=data.get("page", 1),
+            per_page=data.get("per_page", 10),
+            total_pages=data.get("total_pages", 0),
+            items=[ExploitWithCVE.from_dict(e) for e in data.get("items", [])],
+        )
+
+
+@dataclass
 class ExploitFile:
     """A file inside an exploit archive."""
 

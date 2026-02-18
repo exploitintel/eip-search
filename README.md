@@ -19,6 +19,8 @@ Part of the same project family:
 ## Highlights
 
 - Search 370K+ vulnerabilities and 105K+ exploits from one CLI
+- Browse exploits directly by source, language, vendor, or attack type
+- Download exploit code by CVE ID — interactive picker selects the best match
 - Combine CVSS, EPSS, KEV, and exploit quality in one view
 - Surface trusted exploit sources first and flag trojans clearly
 - Pull Nuclei templates plus Shodan/FOFA/Google recon dorks
@@ -207,7 +209,7 @@ eip-search --install-completion powershell
 
 ```bash
 eip-search --version
-# eip-search 0.1.1
+# eip-search 0.1.4
 
 eip-search stats
 # Should display platform statistics if your network can reach exploit-intel.com
@@ -270,20 +272,22 @@ $ eip-search CVE-2024-3400
   Exploits (43)
 
     MODULES
-             metasploit  ruby      panos_telemetry_cmd_exec.rb
-             Rank: excellent  LLM: working_poc  has code
+      #48006          metasploit  ruby      panos_telemetry_cmd_exec.rb
+                      Rank: excellent  LLM: working_poc  has code
 
     PROOF OF CONCEPT
-             exploitdb   text      EDB-51996
-             LLM: working_poc  has code
-      ★ 161   github      http      h4x0r-dz/CVE-2024-3400
-             LLM: working_poc  has code
-      ★ 90    github      python    W01fh4cker/CVE-2024-3400-RCE-Scan
-             LLM: working_poc  has code
-      ★ 72    github      python    0x0d3ad/CVE-2024-3400
-             LLM: working_poc  has code
+      #9546           exploitdb   text      EDB-51996
+                      LLM: working_poc  has code
+      #370108  ★ 161   github      http      h4x0r-dz/CVE-2024-3400
+                      LLM: working_poc  has code
+      #369757  ★ 90    github      python    W01fh4cker/CVE-2024-3400-RCE-Scan
+                      LLM: working_poc  has code
+      #369206  ★ 72    github      python    0x0d3ad/CVE-2024-3400
+                      LLM: working_poc  has code
       ...
     ... and 32 more PoCs (use --all to show)
+
+    Tip: eip-search view <id> | eip-search download <id> -x
 
   Also Known As
     - EDB: EDB-51996
@@ -314,25 +318,27 @@ $ eip-search info CVE-2019-0708
   Exploits (127)
 
     MODULES
-             metasploit  ruby      cve_2019_0708_bluekeep_rce.rb
-             Rank: manual  LLM: working_poc  has code
-             metasploit  ruby      cve_2019_0708_bluekeep.rb
-             LLM: working_poc  has code
+      #47841          metasploit  ruby      cve_2019_0708_bluekeep_rce.rb
+                      Rank: manual  LLM: working_poc  has code
+      #47840          metasploit  ruby      cve_2019_0708_bluekeep.rb
+                      LLM: working_poc  has code
 
     VERIFIED
-             exploitdb   ruby      EDB-47416
-             LLM: working_poc  ✓ verified  has code
+      #9123           exploitdb   ruby      EDB-47416
+                      LLM: working_poc  ✓ verified  has code
 
     PROOF OF CONCEPT
-      ★ 1187  nomisec               Ekultek/BlueKeep
-      ★ 497   nomisec               n1xbyte/CVE-2019-0708
-      ★ 389   nomisec               k8gege/CVE-2019-0708
+      #72412  ★ 1187  nomisec               Ekultek/BlueKeep
+      #72419  ★ 497   nomisec               n1xbyte/CVE-2019-0708
+      #72417  ★ 389   nomisec               k8gege/CVE-2019-0708
       ...
     ... and 113 more PoCs (use --all to show)
 
     SUSPICIOUS
-      ★ 2     nomisec               ttsite/CVE-2019-0708-
-             ⚠ TROJAN — flagged by AI analysis
+      #72431  ★ 2     nomisec               ttsite/CVE-2019-0708-
+                      ⚠ TROJAN — flagged by AI analysis
+
+    Tip: eip-search view <id> | eip-search download <id> -x
 
 ```
 
@@ -391,39 +397,109 @@ $ eip-search nuclei CVE-2024-27198
     Run:  nuclei -t CVE-2024-27198 -u https://target.com
 ```
 
+## Browse Exploits
+
+Search exploits directly by source, language, vendor, author, or attack type — no CVE ID needed:
+
+```bash
+# All Metasploit RCE modules
+eip-search exploits --source metasploit --attack-type RCE
+
+# Python exploits for Fortinet with downloadable code
+eip-search exploits "fortinet" --language python --has-code
+
+# Exploits for a specific CVE
+eip-search exploits --cve CVE-2024-3400
+
+# Exploits by a specific author, ranked by GitHub stars
+eip-search exploits --author "Chocapikk" --sort stars_desc
+```
+
+```
+$ eip-search exploits "mitel" --has-code -n 5
+```
+```
+┏━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ ID      ┃ CVE              ┃    Sev     ┃ Source      ┃ Lang   ┃   ★ ┃ Name                    ┃
+┡━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ 426906  │ CVE-2024-41713   │  CRITICAL  │ nomisec     │        │  19 │ watchtowrlabs/Mitel-M…  │
+│ 426908  │ CVE-2024-41713   │  CRITICAL  │ nomisec     │        │     │ Sanandd/cve-2024-CVE…   │
+│ 426907  │ CVE-2024-41713   │  CRITICAL  │ nomisec     │        │     │ zxj-hub/CVE-2024-417…   │
+│ 426615  │ CVE-2024-35315   │   MEDIUM   │ nomisec     │        │   1 │ ewilded/CVE-2024-353…   │
+│ 426909  │ CVE-2024-41713   │  CRITICAL  │ nomisec     │        │     │ amanverma-wsu/CVE-20…   │
+└─────────┴──────────────────┴────────────┴─────────────┴────────┴─────┴─────────────────────────┘
+Page 1/5 (89 total results)
+Tip: eip-search view <id> | eip-search download <id> -x
+```
+
+Every result includes the exploit ID, associated CVE, severity, source, language, and GitHub stars. Use the exploit ID directly with `view` or `download`.
+
 ## View Exploit Source Code
 
-Read exploit code directly in your terminal with syntax highlighting:
+Read exploit code directly in your terminal with syntax highlighting. Pass an exploit ID or a CVE ID:
 
-```
+```bash
+# By exploit ID (from search, info, or exploits output)
 $ eip-search view 77423
-```
-```
-  fullhunt-log4j-scan-07f7e32/log4j-scan.py
 
-      1 #!/usr/bin/env python3
-      2 # coding=utf-8
-      3 # ******************************************************************
-      4 # log4j-scan: A generic scanner for Apache log4j RCE CVE-2021-44228
-      5 # Author:
-      6 # Mazin Ahmed <Mazin at FullHunt.io>
-      7 # Scanner provided by FullHunt.io - The Next-Gen Attack Surface Management Platform.
-      8 # Secure your Attack Surface with FullHunt.io.
-      9 # ******************************************************************
-     10
-     11 import argparse
-     12 import random
-     13 import requests
-     ...
+# By CVE ID — shows an interactive picker to choose which exploit
+$ eip-search view CVE-2024-3400
+```
+```
+  Exploits for CVE-2024-3400:
+
+  [1]  #48006          metasploit  ruby      panos_telemetry_cmd_exec.rb
+                       Rank: excellent  working_poc
+  [2]  #9546           exploitdb   text      EDB-51996
+                       working_poc
+  [3]  #370108  ★ 161   github      http      h4x0r-dz/CVE-2024-3400
+                       working_poc
+
+  Select [1-43, default=1]: 1
+```
+```
+  panos_telemetry_cmd_exec.rb
+
+      1 ##
+      2 # This module requires Metasploit: https://metasploit.com/download
+      3 # Current source: https://github.com/rapid7/metasploit-framework
+      4 ##
+      5
+      6 class MetasploitModule < Msf::Exploit::Remote
+      7   Rank = ExcellentRanking
+      8   ...
 ```
 
 When an exploit has multiple files, eip-search auto-selects the most relevant code file. Use `--file` to pick a specific one.
 
 ## Download Exploit Code
 
-Download and optionally extract exploit archives:
+Download and optionally extract exploit archives. Pass an exploit ID or a CVE ID:
 
+```bash
+# By CVE ID — interactive picker, auto-extracts
+$ eip-search download CVE-2024-3400 --extract
 ```
+```
+  Exploits with code for CVE-2024-3400:
+
+  [1]  #48006          metasploit  ruby      panos_telemetry_cmd_exec.rb
+                       Rank: excellent  working_poc
+  [2]  #9546           exploitdb   text      EDB-51996
+                       working_poc
+  ...
+
+  Select [1-43, default=1]: 1
+
+Downloaded: metasploit-modules_exploits_linux_http_panos_telemetry_cmd_exec.rb.zip
+ZIP password: eip (exploit archives are password-protected to prevent AV quarantine)
+Extracted:  metasploit-modules_exploits_linux_http_panos_telemetry_cmd_exec.rb/
+Files (1):
+  - panos_telemetry_cmd_exec.rb
+```
+
+```bash
+# By exploit ID — downloads directly, no picker
 $ eip-search download 77423 --extract
 ```
 ```
@@ -433,14 +509,9 @@ Extracted:  nomisec-fullhunt_log4j-scan/
 Files (10):
   - fullhunt-log4j-scan-07f7e32/.gitignore
   - fullhunt-log4j-scan-07f7e32/Dockerfile
-  - fullhunt-log4j-scan-07f7e32/FAQ.md
-  - fullhunt-log4j-scan-07f7e32/LICENSE.txt
-  - fullhunt-log4j-scan-07f7e32/README.md
-  - fullhunt-log4j-scan-07f7e32/headers-large.txt
-  - fullhunt-log4j-scan-07f7e32/headers-minimal.txt
-  - fullhunt-log4j-scan-07f7e32/headers.txt
   - fullhunt-log4j-scan-07f7e32/log4j-scan.py
   - fullhunt-log4j-scan-07f7e32/requirements.txt
+  ...
 ```
 
 > **Note:** Downloaded ZIPs are encrypted with password **`eip`** as a safety measure to prevent antivirus software from quarantining exploit code. Use `--extract` / `-x` to automatically unzip.
@@ -549,13 +620,16 @@ $ eip-search stats
 | Command | Description |
 |---|---|
 | `eip-search "query"` | Quick search (auto-routes CVE IDs to detail view) |
-| `eip-search search "query" [filters]` | Search with full filter support |
+| `eip-search search "query" [filters]` | Search vulnerabilities with full filter support |
+| `eip-search exploits "query" [filters]` | Browse/search exploits directly |
 | `eip-search info CVE-ID` | Full intelligence brief for a vulnerability |
 | `eip-search triage [filters]` | Risk-sorted view of what to worry about |
 | `eip-search nuclei CVE-ID` | Nuclei templates + Shodan/FOFA/Google dorks |
-| `eip-search view EXPLOIT-ID` | Syntax-highlighted exploit source code |
-| `eip-search download EXPLOIT-ID` | Download exploit code as ZIP |
+| `eip-search view ID-or-CVE` | Syntax-highlighted exploit source code |
+| `eip-search download ID-or-CVE` | Download exploit code as ZIP |
 | `eip-search stats` | Platform-wide statistics |
+
+The `view` and `download` commands accept either an exploit ID (e.g. `77423`) or a CVE ID (e.g. `CVE-2024-3400`). When given a CVE, they show an interactive picker ranked by exploit quality.
 
 ## Search Filters
 
@@ -576,6 +650,29 @@ $ eip-search stats
 | `--date-to` | | End date (YYYY-MM-DD) |
 | `--sort` | | newest, oldest, cvss_desc, epss_desc, relevance |
 | `--json` | `-j` | JSON output for scripting |
+
+## Exploit Filters
+
+The `exploits` command has its own filter set for exploit-centric searching:
+
+| Filter | Short | Description |
+|---|---|---|
+| `--source` | | github, metasploit, exploitdb, nomisec |
+| `--language` | `-l` | python, ruby, go, c, etc. |
+| `--classification` | | LLM class: working_poc, scanner, trojan |
+| `--attack-type` | | RCE, SQLi, XSS, DoS, LPE, auth_bypass, info_leak |
+| `--complexity` | | trivial, simple, moderate, complex |
+| `--reliability` | | reliable, unreliable, untested |
+| `--author` | | Filter by exploit author name |
+| `--min-stars` | | Minimum GitHub stars |
+| `--has-code` | `-c` | Only exploits with downloadable code |
+| `--cve` | | Filter by CVE ID |
+| `--vendor` | `-v` | Filter by vendor name |
+| `--product` | `-p` | Filter by product name |
+| `--sort` | | newest, stars_desc |
+| `--json` | `-j` | JSON output for scripting |
+
+The positional query is auto-detected: CVE IDs map to `--cve`, other text maps to `--vendor`.
 
 ## How Exploit Ranking Works
 

@@ -12,7 +12,9 @@ from rich.text import Text
 
 from eip_search.models import (
     Exploit,
+    ExploitBrowseResult,
     ExploitFile,
+    ExploitWithCVE,
     NucleiTemplate,
     SearchResult,
     Stats,
@@ -123,6 +125,120 @@ def print_search_results(result: SearchResult) -> None:
         f"\n[dim]Page {result.page}/{result.total_pages} "
         f"({result.total:,} total results)[/dim]\n"
     )
+
+
+# ---------------------------------------------------------------------------
+# Exploit browse results table
+# ---------------------------------------------------------------------------
+
+def print_exploit_results(result: ExploitBrowseResult) -> None:
+    """Print a paginated exploit browse results table."""
+    if result.total == 0:
+        console.print("\n[dim]No exploits found.[/dim]\n")
+        return
+
+    table = Table(
+        show_header=True,
+        header_style="bold",
+        border_style="dim",
+        pad_edge=False,
+        expand=True,
+    )
+    table.add_column("ID", style="dim cyan", no_wrap=True, width=8)
+    table.add_column("CVE", style="bold cyan", no_wrap=True, min_width=16)
+    table.add_column("Sev", justify="center", no_wrap=True, width=10)
+    table.add_column("Source", no_wrap=True, width=11)
+    table.add_column("Lang", no_wrap=True, width=8)
+    table.add_column("\u2605", justify="right", no_wrap=True, width=5)
+    table.add_column("Name", ratio=1)
+
+    src_styles = {
+        "metasploit": "bold magenta",
+        "exploitdb": "bold green",
+        "nomisec": "cyan",
+        "github": "cyan",
+        "writeup": "dim",
+        "ghsa": "blue",
+    }
+
+    for e in result.items:
+        stars_text = Text(str(e.github_stars), style="yellow") if e.github_stars else Text("", style="dim")
+        name = e.display_name
+        if len(name) > 40:
+            name = name[:37] + "..."
+        table.add_row(
+            Text(str(e.id), style="dim cyan"),
+            Text(e.cve_id or "", style="bold cyan"),
+            _severity_badge(e.severity_label),
+            Text(e.source, style=src_styles.get(e.source, "dim")),
+            Text(e.language or "", style="dim"),
+            stars_text,
+            Text(name, overflow="ellipsis", no_wrap=True),
+        )
+
+    console.print()
+    console.print(table)
+    console.print(
+        f"\n[dim]Page {result.page}/{result.total_pages} "
+        f"({result.total:,} total results)[/dim]"
+    )
+    console.print("[dim]Tip: eip-search view <id> | eip-search download <id> -x[/dim]\n")
+
+
+# ---------------------------------------------------------------------------
+# Exploit picker (interactive selection for download/view by CVE)
+# ---------------------------------------------------------------------------
+
+def print_exploit_picker(exploits: list[Exploit], vuln_id: str, *, code_only: bool = False) -> None:
+    """Print a numbered list of exploits for interactive selection."""
+    label = "with code " if code_only else ""
+    console.print(f"\n  [bold]Exploits {label}for {vuln_id}:[/bold]\n")
+
+    src_styles = {
+        "metasploit": "bold magenta",
+        "exploitdb": "bold green",
+        "nomisec": "cyan",
+        "github": "cyan",
+        "writeup": "dim",
+        "ghsa": "blue",
+    }
+
+    for i, e in enumerate(exploits, 1):
+        line = Text("  ")
+        line.append(f"[{i}]", style="bold")
+        line.append("  ")
+        line.append(f"#{e.id:<7}", style="dim cyan")
+        line.append(" ")
+
+        if e.github_stars is not None and e.source in ("github", "nomisec") and e.github_stars > 0:
+            line.append(f"\u2605 {e.github_stars:<5}", style="yellow")
+            line.append(" ")
+        else:
+            line.append("       ")
+
+        line.append(f"{e.source:<12}", style=src_styles.get(e.source, "dim"))
+        lang = e.language or ""
+        line.append(f"{lang:<10}", style="dim")
+
+        name = e.display_name
+        if len(name) > 45:
+            name = name[:42] + "..."
+        line.append(escape(name))
+
+        console.print(line)
+
+        # Metadata line
+        details: list[str] = []
+        if e.exploit_rank:
+            details.append(f"Rank: {e.exploit_rank}")
+        if e.llm_classification:
+            details.append(e.llm_classification)
+        if e.verified:
+            details.append("\u2713 verified")
+        if details:
+            console.print(f"         {'':>7}       [dim]{'  '.join(details)}[/dim]")
+
+    console.print()
 
 
 # ---------------------------------------------------------------------------

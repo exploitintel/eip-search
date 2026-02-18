@@ -26,7 +26,7 @@ _app = typer.Typer(
 )
 
 # Known subcommands for argv routing
-_SUBCOMMANDS = {"search", "info", "view", "download", "triage", "nuclei", "stats"}
+_SUBCOMMANDS = {"search", "info", "view", "download", "triage", "nuclei", "exploits", "stats"}
 
 
 def app():
@@ -156,12 +156,13 @@ def main() -> None:
 
     \b
     Other commands:
-      eip-search info CVE-2024-3400      Full intelligence brief
-      eip-search triage --vendor apache   Risk-based triage
-      eip-search nuclei CVE-2024-27198   Nuclei templates + dorks
-      eip-search view 77423              View exploit source code
-      eip-search download 77423          Download exploit ZIP
-      eip-search stats                   Platform statistics
+      eip-search info CVE-2024-3400          Full intelligence brief
+      eip-search exploits "fortinet" -c      Browse exploits directly
+      eip-search triage --vendor apache      Risk-based triage
+      eip-search nuclei CVE-2024-27198      Nuclei templates + dorks
+      eip-search view CVE-2024-3400         View exploit code (picks best)
+      eip-search download CVE-2024-3400 -x  Download exploit ZIP
+      eip-search stats                      Platform statistics
     """
     pass
 
@@ -235,17 +236,97 @@ def _do_info(vuln_id: str, *, show_all: bool = False, output_json: bool = False)
 
 
 # ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  CVE → EXPLOIT PICKER (shared by view/download)                        ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+
+def _resolve_exploit_id(target: str, *, code_only: bool = False) -> int:
+    """Resolve a target to an integer exploit ID.
+
+    If *target* is a plain integer, return it directly.  If it looks like a
+    CVE/EIP ID, fetch the vulnerability, rank its exploits, and present an
+    interactive picker.  *code_only* filters to exploits with downloadable code.
+    """
+    # Plain integer → use directly
+    try:
+        return int(target)
+    except ValueError:
+        pass
+
+    if not _is_vuln_id(target):
+        from eip_search.display import print_error
+        print_error(f"'{target}' is not a valid exploit ID or CVE ID.")
+        raise typer.Exit(1)
+
+    from eip_search import client
+    from eip_search.ranking import rank_exploits
+    from eip_search.display import print_exploit_picker
+
+    vuln_id = _normalize_vuln_id(target)
+    vuln = _api_call(client.get_vuln_detail, vuln_id, spinner_text=f"Fetching {vuln_id}...")
+
+    candidates = vuln.exploits
+    if code_only:
+        candidates = [e for e in candidates if e.has_code]
+
+    if not candidates:
+        from eip_search.display import print_error
+        label = "with downloadable code " if code_only else ""
+        print_error(f"No exploits {label}found for {vuln_id}")
+        raise typer.Exit(1)
+
+    # Rank and filter out trojans/suspicious for the picker
+    ranked = rank_exploits(list(candidates))
+    safe = [e for e in ranked if not e.is_suspicious]
+    if not safe:
+        safe = ranked  # fall back to all if everything is suspicious
+
+    if len(safe) == 1:
+        return safe[0].id
+
+    print_exploit_picker(safe, vuln_id, code_only=code_only)
+
+    choice = None
+    while choice is None:
+        raw = console.input(f"  Select [bold][1-{len(safe)}, default=1][/bold]: ").strip()
+        if raw == "":
+            choice = 1
+        else:
+            try:
+                choice = int(raw)
+                if choice < 1 or choice > len(safe):
+                    console.print(f"  [red]Enter a number between 1 and {len(safe)}[/red]")
+                    choice = None
+            except ValueError:
+                console.print(f"  [red]Enter a number between 1 and {len(safe)}[/red]")
+
+    return safe[choice - 1].id
+
+
+# ╔═══════════════════════════════════════════════════════════════════════════╗
 # ║  VIEW COMMAND                                                           ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 
 @_app.command()
 def view(
-    exploit_id: int = typer.Argument(..., help="Exploit ID"),
+    target: str = typer.Argument(..., help="Exploit ID or CVE-ID (e.g. 77423 or CVE-2024-3400)"),
     file: Optional[str] = typer.Option(None, "--file", "-f", help="Specific file path to view"),
 ) -> None:
-    """View exploit source code with syntax highlighting."""
+    """View exploit source code with syntax highlighting.
+
+    \b
+    Accepts an exploit ID or a CVE ID.  When given a CVE, shows an
+    interactive picker to choose which exploit to view.
+
+    \b
+    Examples:
+      eip-search view 77423
+      eip-search view CVE-2024-3400
+      eip-search view 77423 --file exploit.py
+    """
     from eip_search import client
     from eip_search.display import print_code, print_exploit_files
+
+    exploit_id = _resolve_exploit_id(target)
 
     files = _api_call(client.list_exploit_files, exploit_id, spinner_text=f"Listing files for exploit {exploit_id}...")
 
@@ -303,11 +384,15 @@ def _pick_main_file(files) -> str | None:
 
 @_app.command()
 def download(
-    exploit_id: int = typer.Argument(..., help="Exploit ID to download"),
+    target: str = typer.Argument(..., help="Exploit ID or CVE-ID (e.g. 77423 or CVE-2024-3400)"),
     extract: bool = typer.Option(False, "--extract", "-x", help="Extract the ZIP after downloading"),
     output_dir: Optional[str] = typer.Option(None, "--output", "-o", help="Output directory (default: current dir)"),
 ) -> None:
     """Download exploit code as a password-protected ZIP.
+
+    \b
+    Accepts an exploit ID or a CVE ID.  When given a CVE, shows an
+    interactive picker to choose which exploit to download.
 
     \b
     Downloaded ZIPs are encrypted with password "eip" (as a safety measure
@@ -318,6 +403,7 @@ def download(
 
     \b
     Examples:
+      eip-search download CVE-2024-3400 -x
       eip-search download 77423
       eip-search download 77423 --extract
       eip-search download 77423 -x -o /tmp/exploits
@@ -325,6 +411,8 @@ def download(
     import zipfile
     from pathlib import Path
     from eip_search import client
+
+    exploit_id = _resolve_exploit_id(target, code_only=True)
 
     dest = Path(output_dir) if output_dir else Path.cwd()
     if not dest.exists():
@@ -485,6 +573,96 @@ def triage(
 
 
 # ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  EXPLOITS COMMAND                                                       ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+
+@_app.command()
+def exploits(
+    query: Optional[str] = typer.Argument(None, help="CVE ID, vendor, or product to filter by"),
+    source: Optional[str] = typer.Option(None, "--source", help="Source: github, metasploit, exploitdb, nomisec"),
+    language: Optional[str] = typer.Option(None, "--language", "-l", help="Language: python, ruby, go, c, etc."),
+    classification: Optional[str] = typer.Option(None, "--classification", help="LLM class: working_poc, scanner, trojan"),
+    attack_type: Optional[str] = typer.Option(None, "--attack-type", help="Attack: RCE, SQLi, XSS, DoS, LPE, auth_bypass"),
+    complexity: Optional[str] = typer.Option(None, "--complexity", help="Complexity: trivial, simple, moderate, complex"),
+    reliability: Optional[str] = typer.Option(None, "--reliability", help="Reliability: reliable, unreliable, untested"),
+    author: Optional[str] = typer.Option(None, "--author", help="Filter by author name"),
+    min_stars: Optional[int] = typer.Option(None, "--min-stars", help="Minimum GitHub stars"),
+    has_code: bool = typer.Option(False, "--has-code", "-c", help="Only exploits with downloadable code"),
+    cve: Optional[str] = typer.Option(None, "--cve", help="Filter by CVE ID"),
+    vendor: Optional[str] = typer.Option(None, "--vendor", "-v", help="Filter by vendor name"),
+    product: Optional[str] = typer.Option(None, "--product", "-p", help="Filter by product name"),
+    sort: Optional[str] = typer.Option(None, "--sort", help="Sort: newest, stars_desc"),
+    page: int = typer.Option(1, "--page", help="Page number"),
+    per_page: Optional[int] = typer.Option(None, "--per-page", "-n", help="Results per page (max 25)"),
+    output_json: bool = typer.Option(False, "--json", "-j", help="Output raw JSON"),
+) -> None:
+    """Browse and search exploits directly.
+
+    \b
+    Search exploits by source, language, attack type, author, and more.
+    The positional query is auto-detected: CVE IDs map to --cve, other
+    text maps to --vendor.
+
+    \b
+    Examples:
+      eip-search exploits --source metasploit --attack-type RCE
+      eip-search exploits "fortinet" --language python --has-code
+      eip-search exploits --cve CVE-2024-3400
+      eip-search exploits --author "Chocapikk" --sort stars_desc
+    """
+    from eip_search import client
+    from eip_search.config import get_config
+
+    # Auto-detect positional query: CVE ID → --cve, otherwise → --vendor
+    if query and not cve and not vendor:
+        if _is_vuln_id(query):
+            cve = _normalize_vuln_id(query)
+        else:
+            vendor = query
+
+    has_filters = any([
+        source, language, classification, attack_type, complexity, reliability,
+        author, min_stars, has_code, cve, vendor, product,
+    ])
+    if not has_filters:
+        from eip_search.display import print_error
+        print_error("Provide a query or at least one filter. Try: eip-search exploits --help")
+        raise typer.Exit(1)
+
+    params = {
+        "source": source,
+        "language": language,
+        "llm_classification": classification,
+        "attack_type": attack_type,
+        "complexity": complexity,
+        "reliability": reliability,
+        "author": author,
+        "min_stars": min_stars,
+        "has_code": has_code or None,
+        "cve": cve,
+        "vendor": vendor,
+        "product": product,
+        "sort": sort or "newest",
+        "page": page,
+        "per_page": per_page or min(get_config().per_page, 25),
+    }
+
+    result = _api_call(client.browse_exploits, params, spinner_text="Searching exploits...")
+
+    if output_json:
+        _json_out({
+            "total": result.total,
+            "page": result.page,
+            "per_page": result.per_page,
+            "total_pages": result.total_pages,
+            "items": [_exploit_with_cve_dict(e) for e in result.items],
+        })
+    else:
+        from eip_search.display import print_exploit_results
+        print_exploit_results(result)
+
+
+# ╔═══════════════════════════════════════════════════════════════════════════╗
 # ║  NUCLEI COMMAND                                                         ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 
@@ -583,6 +761,25 @@ def _vuln_summary_dict(v) -> dict:
         "exploit_count": v.exploit_count,
         "cwe_ids": v.cwe_ids,
         "cve_published_at": v.cve_published_at,
+    }
+
+
+def _exploit_with_cve_dict(e) -> dict:
+    return {
+        "id": e.id,
+        "source": e.source,
+        "source_id": e.source_id,
+        "source_url": e.source_url,
+        "language": e.language,
+        "github_stars": e.github_stars,
+        "verified": e.verified,
+        "exploit_rank": e.exploit_rank,
+        "llm_classification": e.llm_classification,
+        "has_code": e.has_code,
+        "cve_id": e.cve_id,
+        "cve_title": e.cve_title,
+        "severity_label": e.severity_label,
+        "cvss_v3_score": e.cvss_v3_score,
     }
 
 

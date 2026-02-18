@@ -12,6 +12,7 @@ from rich.console import Console
 from eip_search import __version__
 from eip_search.config import get_config
 from eip_search.models import (
+    ExploitBrowseResult,
     ExploitFile,
     SearchResult,
     Stats,
@@ -117,6 +118,17 @@ def search_vulns(params: dict[str, Any]) -> SearchResult:
     with httpx.Client(timeout=TIMEOUT, headers=_build_headers(), follow_redirects=True) as client:
         resp = client.get(_api_url("/api/v1/vulns"), params=clean)
     return SearchResult.from_dict(_handle_response(resp))
+
+
+def browse_exploits(params: dict[str, Any]) -> ExploitBrowseResult:
+    """Browse/search exploits with filters.
+
+    ``params`` maps directly to the /api/v1/exploits query parameters.
+    """
+    clean = {k: v for k, v in params.items() if v is not None}
+    with httpx.Client(timeout=TIMEOUT, headers=_build_headers(), follow_redirects=True) as client:
+        resp = client.get(_api_url("/api/v1/exploits"), params=clean)
+    return ExploitBrowseResult.from_dict(_handle_response(resp))
 
 
 def get_vuln_detail(vuln_id: str) -> VulnDetail:
