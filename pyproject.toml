@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68.0", "wheel"]
+requires = ["setuptools>=77.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,7 +8,8 @@ version = "0.1.1"
 description = "CLI intelligence tool for the Exploit Intelligence Platform — a modern searchsploit replacement"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{name = "Exploit Intelligence Platform"}]
 keywords = ["security", "exploits", "vulnerability", "cve", "searchsploit", "pentesting"]
 classifiers = [
@@ -20,7 +21,6 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "License :: OSI Approved :: MIT License",
 ]
 dependencies = [
     "typer>=0.9.0",
@@ -39,6 +39,3 @@ Repository = "https://github.com/exploit-intel/eip-search"
 
 [tool.setuptools.packages.find]
 include = ["eip_search*"]
-
-[tool.setuptools]
-license-files = ["LICENSE"]

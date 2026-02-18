@@ -20,7 +20,7 @@ endif
 		(echo "ERROR: VERSION must be semver (e.g. 0.2.0), got: $(VERSION)" && exit 1)
 	@# Bump version in both files
 	@echo "--- Bumping version to $(VERSION)"
-	python scripts/bump_version.py $(VERSION)
+	python3 scripts/bump_version.py $(VERSION)
 	@# Clean, build, check, upload
 	$(MAKE) clean
 	$(MAKE) build
@@ -42,12 +42,12 @@ endif
 # ── Build sdist + wheel ───────────────────────────────────────────────────────
 build:
 	@echo "--- Building package"
-	python -m build
+	python3 -m build
 
 # ── Remove build artifacts ────────────────────────────────────────────────────
 clean:
 	@echo "--- Cleaning build artifacts"
-	rm -rf dist/ build/ *.egg-info
+	rm -rf dist/ build/ eip_search.egg-info/
 
 # ── Dry-run: build and validate with twine ────────────────────────────────────
 check:
