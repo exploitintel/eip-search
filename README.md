@@ -1,4 +1,6 @@
-# eip-search
+# Exploit Intel Platform CLI Search Tool
+
+Package/command: `eip-search`
 
 <p align="center">
   <img src="https://exploit-intel.com/static/brand/mark-cyan.svg" width="160" alt="Exploit Intel Platform (EIP)" />
