@@ -4,6 +4,8 @@ A modern **searchsploit replacement** powered by the [Exploit Intelligence Platf
 
 Search 370K+ vulnerabilities and 105K+ exploits from 4 sources with risk intelligence, exploit quality ranking, Nuclei scanner integration, and trojan warnings — all from your terminal.
 
+![eip-search CLI screenshot](eip-search.png)
+
 Part of the same project family:
 - [`eip-search`](https://github.com/exploit-intel/eip-search) — terminal client
 - [`eip-mcp`](https://github.com/exploit-intel/eip-mcp) — MCP server for AI assistants

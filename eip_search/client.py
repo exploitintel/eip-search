@@ -9,6 +9,7 @@ from typing import Any
 import httpx
 from rich.console import Console
 
+from eip_search import __version__
 from eip_search.config import get_config
 from eip_search.models import (
     ExploitFile,
@@ -20,7 +21,7 @@ from eip_search.models import (
 console = Console(stderr=True)
 
 # Reusable client headers
-USER_AGENT = "eip-search/0.1.0"
+USER_AGENT = f"eip-search/{__version__}"
 TIMEOUT = httpx.Timeout(connect=10.0, read=30.0, write=10.0, pool=10.0)
 
 
