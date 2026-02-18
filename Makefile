@@ -1,4 +1,4 @@
-.PHONY: release build clean check deb pypi
+.PHONY: release tag-release build clean check deb pypi
 
 # ── Dependency checks ────────────────────────────────────────────────────────
 require = $(if $(shell command -v $(1) 2>/dev/null),,$(error "$(1)" not found. $(2)))
@@ -52,6 +52,33 @@ endif
 	@echo ""
 	@echo "==> eip-search $(VERSION) released!"
 	@echo "    https://pypi.org/project/eip-search/$(VERSION)/"
+	@echo ""
+
+# ── Tag a release (CI builds + uploads) ──────────────────────────────────────
+#   make tag-release VERSION=0.2.0
+#
+# Bumps version, commits, tags, and pushes. GitHub Actions handles
+# building PyPI packages, .debs, uploading to PyPI, and creating
+# the GitHub release.
+
+tag-release:
+ifndef VERSION
+	$(error VERSION is required. Usage: make tag-release VERSION=0.2.0)
+endif
+	@echo "$(VERSION)" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$$' || \
+		(echo "ERROR: VERSION must be semver (e.g. 0.2.0), got: $(VERSION)" && exit 1)
+	@echo ""
+	@echo "==> Tagging eip-search $(VERSION) (CI will build and release)"
+	@echo ""
+	python3 scripts/bump_version.py $(VERSION)
+	git add pyproject.toml eip_search/__init__.py
+	git commit -m "Bump version to $(VERSION)"
+	git tag v$(VERSION)
+	git push
+	git push --tags
+	@echo ""
+	@echo "==> Tag v$(VERSION) pushed — GitHub Actions will build and release."
+	@echo "    Watch progress: gh run watch"
 	@echo ""
 
 # ── Build sdist + wheel ───────────────────────────────────────────────────────

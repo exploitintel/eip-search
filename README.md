@@ -127,6 +127,7 @@ pip install -e .
 | `make build` | Python 3, `build` module (`pip install build`) |
 | `make check` / `make pypi` | `twine` (`pip install twine`) |
 | `make deb` | Docker |
+| `make tag-release` | Python 3 (version bump only — CI handles the rest) |
 | `make release` | All of the above + `gh` CLI ([cli.github.com](https://cli.github.com)) |
 
 Install everything at once:
@@ -168,9 +169,17 @@ dist/eip-search_0.2.0_debian-bookworm_all.deb
 dist/eip-search_0.2.0_kali-rolling_all.deb
 ```
 
-### Full Release
+### Releasing
 
-Bumps version, builds PyPI + all `.deb`s, uploads to PyPI, commits, tags, pushes, and creates a GitHub release with `.deb`s attached:
+**One-time setup:** add a `PYPI_API_TOKEN` repository secret in GitHub (Settings → Secrets → Actions).
+
+**Automated release (recommended)** — bumps version, commits, tags, and pushes. GitHub Actions builds PyPI packages + all 4 `.deb`s, uploads to PyPI, and creates a GitHub release with artifacts attached:
+
+```bash
+make tag-release VERSION=0.2.0
+```
+
+**Local release (alternative)** — does everything locally without CI:
 
 ```bash
 make release VERSION=0.2.0
