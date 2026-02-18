@@ -278,12 +278,19 @@ def _print_exploit_groups(groups: ExploitGroups) -> None:
         for e in groups.suspicious:
             _print_exploit_line(e, indent=6, suspicious=True)
 
+    if total > 0:
+        console.print()
+        console.print("    [dim]Tip: eip-search view <id> | eip-search download <id> -x[/dim]")
 
 
 def _print_exploit_line(exploit: Exploit, *, indent: int = 4, suspicious: bool = False) -> None:
     """Print a single exploit line."""
     pad = " " * indent
     line = Text(pad)
+
+    # Exploit ID (needed for view/download commands)
+    id_str = f"#{exploit.id}"
+    line.append(f"{id_str:<8}", style="dim cyan")
 
     # Stars (for GitHub/nomisec)
     if exploit.github_stars is not None and exploit.source in ("github", "nomisec"):
@@ -320,7 +327,7 @@ def _print_exploit_line(exploit: Exploit, *, indent: int = 4, suspicious: bool =
     console.print(line)
 
     # Second line: metadata
-    meta = Text(pad + "       ")
+    meta = Text(pad + " " * 8 + "       ")
     details: list[str] = []
 
     if exploit.exploit_rank:
@@ -335,7 +342,7 @@ def _print_exploit_line(exploit: Exploit, *, indent: int = 4, suspicious: bool =
     if suspicious and exploit.llm_classification in ("trojan", "suspicious"):
         warning = "\u26a0 " + ("TROJAN" if exploit.llm_classification == "trojan" else "SUSPICIOUS")
         warning += " \u2014 flagged by AI analysis"
-        console.print(f"{pad}       [bold red]{warning}[/bold red]")
+        console.print(f"{pad}{' ' * 8}       [bold red]{warning}[/bold red]")
     elif details:
         meta.append("  ".join(details), style="dim")
         console.print(meta)
