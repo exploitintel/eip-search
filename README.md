@@ -4,6 +4,17 @@ A modern **searchsploit replacement** powered by the [Exploit Intelligence Platf
 
 Search 370K+ vulnerabilities and 105K+ exploits from 4 sources with risk intelligence, exploit quality ranking, Nuclei scanner integration, and trojan warnings — all from your terminal.
 
+Part of the same project family:
+- [`eip-search`](https://github.com/exploit-intel/eip-search) — terminal client
+- [`eip-mcp`](https://github.com/exploit-intel/eip-mcp) — MCP server for AI assistants
+
+## Highlights
+
+- Search 370K+ vulnerabilities and 105K+ exploits from one CLI
+- Combine CVSS, EPSS, KEV, and exploit quality in one view
+- Surface trusted exploit sources first and flag trojans clearly
+- Pull Nuclei templates plus Shodan/FOFA/Google recon dorks
+
 ## Why eip-search?
 
 **searchsploit** is grep over a CSV. It can tell you an exploit exists, but nothing about how dangerous the vulnerability is, how reliable the exploit is, or whether it's secretly a trojan.
