@@ -24,6 +24,7 @@ class Exploit:
     github_forks: int | None = None
     has_code: bool = False
     llm_classification: str | None = None
+    llm_analysis: dict | None = None
     description: str | None = None
 
     # Computed by ranking algorithm
@@ -47,6 +48,7 @@ class Exploit:
             github_forks=data.get("github_forks"),
             has_code=data.get("has_code", False),
             llm_classification=data.get("llm_classification"),
+            llm_analysis=data.get("llm_analysis"),
             description=data.get("description"),
         )
 
@@ -293,6 +295,7 @@ class ExploitWithCVE(Exploit):
             github_forks=data.get("github_forks"),
             has_code=data.get("has_code", False),
             llm_classification=data.get("llm_classification"),
+            llm_analysis=data.get("llm_analysis"),
             description=data.get("description"),
             cve_id=data.get("cve_id"),
             cve_title=data.get("cve_title"),
@@ -329,6 +332,7 @@ class ExploitFile:
     name: str
     path: str
     size: int
+    file_type: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict) -> ExploitFile:
@@ -336,6 +340,7 @@ class ExploitFile:
             name=data.get("name", ""),
             path=data.get("path", ""),
             size=data.get("size", 0),
+            file_type=data.get("type"),
         )
 
 

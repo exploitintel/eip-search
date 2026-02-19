@@ -26,7 +26,10 @@ _app = typer.Typer(
 )
 
 # Known subcommands for argv routing
-_SUBCOMMANDS = {"search", "info", "view", "download", "triage", "nuclei", "exploits", "stats"}
+_SUBCOMMANDS = {
+    "search", "info", "view", "download", "generate", "triage", "nuclei", "exploits",
+    "stats", "authors", "author", "cwes", "cwe", "vendors", "products", "lookup",
+}
 
 
 def app():
@@ -494,6 +497,229 @@ def download(
 
 
 # ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  GENERATE COMMAND                                                       ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+
+@_app.command()
+def generate(
+    vuln_id: str = typer.Argument(..., help="CVE-ID (e.g. CVE-2024-3400) or EIP-ID"),
+    check: bool = typer.Option(False, "--check", help="Check feasibility only (no Ollama needed)"),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Save generated exploit to file"),
+    no_vision: bool = typer.Option(False, "--no-vision", help="Skip screenshot analysis (faster, text only)"),
+    model: Optional[str] = typer.Option(None, "--model", "-m", help="Override code generation model"),
+    vision_model: Optional[str] = typer.Option(None, "--vision-model", help="Override vision model"),
+) -> None:
+    """Generate a proof-of-concept exploit using a local LLM.
+
+    \b
+    Requires Ollama running locally (https://ollama.com).
+    Fetches CVE intelligence from the API, optionally analyzes writeup
+    screenshots with a vision model, then generates a minimal Python PoC.
+
+    \b
+    Use --check to see the feasibility score without generating anything
+    (no Ollama required).
+
+    \b
+    Configure models in ~/.eip-search.toml:
+      [generate]
+      ollama_url = "http://127.0.0.1:11434"
+      code_model = "kimi-k2:1t-cloud"
+      vision_model = "qwen3-vl:235b-instruct-cloud"
+
+    \b
+    Examples:
+      eip-search generate CVE-2026-2686 --check
+      eip-search generate CVE-2026-2686
+      eip-search generate CVE-2026-2686 --no-vision
+      eip-search generate CVE-2026-2686 -m glm-5:cloud -o exploit.py
+    """
+    from pathlib import Path
+
+    from rich.markup import escape
+    from rich.status import Status
+
+    from eip_search import client
+    from eip_search.config import get_config
+    from eip_search.display import print_code, print_error
+    from eip_search.generate import (
+        OllamaError,
+        build_prompt,
+        check_ollama,
+        classify_feasibility,
+        describe_images,
+        generate_code,
+        wrap_output,
+    )
+
+    cfg = get_config()
+    ollama_url = cfg.ollama_url
+    code_model_name = model or cfg.code_model
+    vision_model_name = vision_model or cfg.vision_model
+    vid = _normalize_vuln_id(vuln_id)
+
+    # -- Fetch CVE intelligence + feasibility gate (before touching Ollama) --
+    vuln = _api_call(client.get_vuln_detail, vid, spinner_text=f"Fetching {vid}...")
+
+    feas = classify_feasibility(vuln)
+    tier_color = {"excellent": "green", "good": "cyan", "possible": "yellow", "difficult": "red"}.get(feas["tier"], "white")
+    console.print()
+    console.print(f"  [bold]{escape(vuln.display_id)}[/bold] — {escape(vuln.title or 'Unknown')}")
+    console.print(
+        f"  CVSS {vuln.cvss_v3_score or '?'} | {feas['attack_type']} | {feas['complexity']} | "
+        f"Feasibility: [{tier_color}]{feas['tier'].upper()} ({feas['score']})[/{tier_color}]"
+    )
+
+    console.print(f"  [dim]Reasons: {', '.join(feas['reasons'])}[/dim]")
+
+    # Count available images
+    writeup_for_check = None
+    for e in vuln.exploits:
+        if e.llm_classification == "writeup":
+            writeup_for_check = e
+            break
+    if not writeup_for_check and vuln.exploits:
+        writeup_for_check = vuln.exploits[0]
+
+    if writeup_for_check:
+        all_files_check = _api_call(
+            client.list_exploit_files, writeup_for_check.id,
+            spinner_text="Listing files...",
+        )
+        img_count = sum(1 for f in all_files_check if f.file_type == "image")
+        txt_count = sum(1 for f in all_files_check if f.file_type != "image")
+        console.print(f"  [dim]Files: {txt_count} text, {img_count} screenshots[/dim]")
+    else:
+        all_files_check = []
+        console.print("  [dim]No exploit files found[/dim]")
+
+    if check:
+        console.print()
+        raise typer.Exit(0)
+
+    if feas["tier"] == "difficult":
+        console.print(
+            "\n  [red]Feasibility too low for automated PoC generation.[/red]"
+        )
+        raise typer.Exit(1)
+
+    if feas["tier"] == "possible":
+        console.print(
+            f"\n  [yellow]Low feasibility — generated PoC may be incomplete or generic.[/yellow]"
+        )
+
+    # -- Check Ollama (only after feasibility passes) --
+    try:
+        available = check_ollama(ollama_url)
+    except OllamaError as exc:
+        print_error(str(exc))
+        raise typer.Exit(1)
+
+    if code_model_name not in available:
+        print_error(
+            f"Code model '{code_model_name}' not found in Ollama.\n"
+            f"Available: {', '.join(available) or '(none)'}\n"
+            f"Pull it with: ollama pull {code_model_name}"
+        )
+        raise typer.Exit(1)
+
+    if not no_vision and vision_model_name not in available:
+        err_console.print(
+            f"[yellow]Vision model '{vision_model_name}' not available — "
+            f"falling back to text-only mode[/yellow]"
+        )
+        no_vision = True
+
+    # -- Find writeup exploit and fetch text --
+    writeup_exploit = None
+    for e in vuln.exploits:
+        if e.llm_classification == "writeup":
+            writeup_exploit = e
+            break
+    if not writeup_exploit and vuln.exploits:
+        writeup_exploit = vuln.exploits[0]
+
+    writeup_text = None
+    if writeup_exploit:
+        files = _api_call(
+            client.list_exploit_files, writeup_exploit.id,
+            spinner_text="Listing exploit files...",
+        )
+        text_files = [f for f in files if f.file_type != "image"]
+        if text_files:
+            writeup_text = _api_call(
+                client.get_exploit_code, writeup_exploit.id, text_files[0].path,
+                spinner_text="Fetching writeup text...",
+            )
+            if writeup_text:
+                console.print(f"  Writeup: {len(writeup_text)} chars from exploit {writeup_exploit.id}")
+
+    # -- Vision stage --
+    image_descs: list[dict] = []
+    if not no_vision and writeup_exploit:
+        all_files = _api_call(
+            client.list_exploit_files, writeup_exploit.id,
+            spinner_text="Listing exploit files...",
+        )
+        image_files = [f for f in all_files if f.file_type == "image"]
+
+        if image_files:
+            console.print(f"\n  Analyzing {len(image_files)} screenshot{'s' if len(image_files) != 1 else ''}...")
+
+            def _on_image_progress(filename: str, desc: str, elapsed: float):
+                preview = desc[:100].replace("\n", " ")
+                if "no actionable" in desc.lower():
+                    console.print(f"    [dim]{escape(filename)}: skipped (no actionable details)[/dim]")
+                else:
+                    console.print(f"    {escape(filename)}: {escape(preview)}... ({elapsed:.1f}s)")
+
+            def _fetch_image(filename: str) -> bytes:
+                return client.get_exploit_image(writeup_exploit.id, filename)
+
+            image_descs = describe_images(
+                image_files,
+                fetch_fn=_fetch_image,
+                ollama_url=ollama_url,
+                model=vision_model_name,
+                on_progress=_on_image_progress,
+            )
+
+            useful = sum(1 for d in image_descs if "no actionable" not in d["description"].lower())
+            console.print(f"  [dim]{useful} useful / {len(image_descs)} total screenshots described[/dim]")
+        else:
+            console.print("  [dim]No screenshots found for this exploit[/dim]")
+
+    # -- Build prompt + generate --
+    prompt = build_prompt(vuln, writeup_text, image_descs)
+    console.print(f"\n  Prompt: {len(prompt)} chars")
+
+    with Status(f"Generating PoC with {code_model_name}...", console=err_console, spinner="dots"):
+        try:
+            raw_code, elapsed = generate_code(prompt, ollama_url, code_model_name)
+        except Exception as exc:
+            print_error(f"Code generation failed: {exc}")
+            raise typer.Exit(1)
+
+    final_code = wrap_output(raw_code, vuln)
+    lines = len(final_code.strip().split("\n"))
+
+    console.print(f"  Generated {lines} lines in {elapsed:.1f}s\n")
+    print_code(final_code, "exploit.py")
+
+    # -- Save to file --
+    if output:
+        out_path = Path(output)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(final_code, encoding="utf-8")
+        console.print(f"\n[bold green]Saved:[/bold green] {out_path}")
+    else:
+        safe_name = vid.replace("-", "_") + ".py"
+        console.print(f"\n[dim]Tip: use -o {safe_name} to save to file[/dim]")
+
+    console.print()
+
+
+# ╔═══════════════════════════════════════════════════════════════════════════╗
 # ║  TRIAGE COMMAND                                                         ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 
@@ -737,6 +963,197 @@ def stats(
     else:
         from eip_search.display import print_stats
         print_stats(data)
+
+
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  AUTHORS COMMANDS                                                       ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+
+@_app.command()
+def authors(
+    page: int = typer.Option(1, "--page", help="Page number"),
+    per_page: Optional[int] = typer.Option(None, "--per-page", "-n", help="Results per page (max 50)"),
+    output_json: bool = typer.Option(False, "--json", "-j", help="Output raw JSON"),
+) -> None:
+    """List top exploit authors ranked by exploit count.
+
+    \b
+    Examples:
+      eip-search authors
+      eip-search authors --page 2 -n 20
+    """
+    from eip_search import client
+
+    params = {"page": page, "per_page": per_page or 25}
+    data = _api_call(client.list_authors, params, spinner_text="Fetching authors...")
+
+    if output_json:
+        _json_out(data)
+    else:
+        from eip_search.display import print_authors_list
+        print_authors_list(data)
+
+
+@_app.command()
+def author(
+    name: str = typer.Argument(..., help="Author name (e.g. 'Metasploit', 'Chocapikk')"),
+    page: int = typer.Option(1, "--page", help="Page number for exploits"),
+    per_page: Optional[int] = typer.Option(None, "--per-page", "-n", help="Exploits per page"),
+    output_json: bool = typer.Option(False, "--json", "-j", help="Output raw JSON"),
+) -> None:
+    """Show an exploit author's profile and their exploits.
+
+    \b
+    Examples:
+      eip-search author Metasploit
+      eip-search author "Chocapikk" --page 2
+    """
+    from eip_search import client
+
+    params = {"page": page, "per_page": per_page or 25}
+    data = _api_call(client.get_author, name, spinner_text=f"Fetching author {name}...", params=params)
+
+    if output_json:
+        _json_out(data)
+    else:
+        from eip_search.display import print_author_detail
+        print_author_detail(data)
+
+
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  CWE COMMANDS                                                           ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+
+@_app.command()
+def cwes(
+    output_json: bool = typer.Option(False, "--json", "-j", help="Output raw JSON"),
+) -> None:
+    """List CWE categories ranked by vulnerability count.
+
+    \b
+    Examples:
+      eip-search cwes
+      eip-search cwes --json
+    """
+    from eip_search import client
+
+    data = _api_call(client.list_cwes, spinner_text="Fetching CWEs...")
+
+    if output_json:
+        _json_out(data)
+    else:
+        from eip_search.display import print_cwe_list
+        print_cwe_list(data)
+
+
+@_app.command()
+def cwe(
+    cwe_id: str = typer.Argument(..., help="CWE identifier (e.g. '79' or 'CWE-79')"),
+    output_json: bool = typer.Option(False, "--json", "-j", help="Output raw JSON"),
+) -> None:
+    """Show details for a specific CWE.
+
+    \b
+    Accepts both numeric ('79') and prefixed ('CWE-79') format.
+
+    \b
+    Examples:
+      eip-search cwe 79
+      eip-search cwe CWE-89
+    """
+    from eip_search import client
+
+    normalized = cwe_id.strip()
+    if normalized.isdigit():
+        normalized = f"CWE-{normalized}"
+
+    data = _api_call(client.get_cwe, normalized, spinner_text=f"Fetching {normalized}...")
+
+    if output_json:
+        _json_out(data)
+    else:
+        from eip_search.display import print_cwe_detail
+        print_cwe_detail(data)
+
+
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  VENDOR / PRODUCT COMMANDS                                              ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+
+@_app.command()
+def vendors(
+    output_json: bool = typer.Option(False, "--json", "-j", help="Output raw JSON"),
+) -> None:
+    """List top vendors ranked by vulnerability count.
+
+    \b
+    Examples:
+      eip-search vendors
+      eip-search vendors --json
+    """
+    from eip_search import client
+
+    data = _api_call(client.list_vendors, spinner_text="Fetching vendors...")
+
+    if output_json:
+        _json_out(data)
+    else:
+        from eip_search.display import print_vendors_list
+        print_vendors_list(data)
+
+
+@_app.command()
+def products(
+    vendor: str = typer.Argument(..., help="Vendor name (e.g. 'apache', 'microsoft')"),
+    output_json: bool = typer.Option(False, "--json", "-j", help="Output raw JSON"),
+) -> None:
+    """List products for a vendor with vulnerability counts.
+
+    \b
+    Use this to discover exact product names for filtering.
+    Product names follow CPE conventions (e.g. 'http_server' not 'apache httpd').
+
+    \b
+    Examples:
+      eip-search products apache
+      eip-search products microsoft --json
+    """
+    from eip_search import client
+
+    data = _api_call(client.list_vendor_products, vendor, spinner_text=f"Fetching products for {vendor}...")
+
+    if output_json:
+        _json_out(data)
+    else:
+        from eip_search.display import print_products_list
+        print_products_list(data)
+
+
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  LOOKUP COMMAND                                                         ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+
+@_app.command()
+def lookup(
+    alt_id: str = typer.Argument(..., help="Alternate ID (e.g. 'EDB-45961', 'GHSA-jfh8-c2jp-5v3q')"),
+    output_json: bool = typer.Option(False, "--json", "-j", help="Output raw JSON"),
+) -> None:
+    """Resolve an ExploitDB or GHSA identifier to its CVE.
+
+    \b
+    Examples:
+      eip-search lookup EDB-45961
+      eip-search lookup GHSA-jfh8-c2jp-5v3q
+    """
+    from eip_search import client
+
+    data = _api_call(client.lookup_alt_id, alt_id, spinner_text=f"Looking up {alt_id}...")
+
+    if output_json:
+        _json_out(data)
+    else:
+        from eip_search.display import print_lookup_result
+        print_lookup_result(data)
 
 
 # ---------------------------------------------------------------------------

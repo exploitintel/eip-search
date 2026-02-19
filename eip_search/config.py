@@ -18,6 +18,9 @@ CONFIG_PATH = Path.home() / ".eip-search.toml"
 DEFAULT_BASE_URL = "https://exploit-intel.com"
 DEFAULT_PER_PAGE = 20
 MAX_PER_PAGE = 100
+DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434"
+DEFAULT_VISION_MODEL = "qwen3-vl:235b-instruct-cloud"
+DEFAULT_CODE_MODEL = "kimi-k2:1t-cloud"
 
 
 @dataclass
@@ -27,6 +30,9 @@ class Config:
     base_url: str = DEFAULT_BASE_URL
     api_key: str | None = None
     per_page: int = DEFAULT_PER_PAGE
+    ollama_url: str = DEFAULT_OLLAMA_URL
+    vision_model: str = DEFAULT_VISION_MODEL
+    code_model: str = DEFAULT_CODE_MODEL
 
     @classmethod
     def load(cls) -> Config:
@@ -42,11 +48,15 @@ class Config:
 
         api_section = data.get("api", {})
         display_section = data.get("display", {})
+        gen_section = data.get("generate", {})
 
         return cls(
             base_url=api_section.get("base_url", DEFAULT_BASE_URL).rstrip("/"),
             api_key=api_section.get("api_key"),
             per_page=min(display_section.get("per_page", DEFAULT_PER_PAGE), MAX_PER_PAGE),
+            ollama_url=gen_section.get("ollama_url", DEFAULT_OLLAMA_URL).rstrip("/"),
+            vision_model=gen_section.get("vision_model", DEFAULT_VISION_MODEL),
+            code_model=gen_section.get("code_model", DEFAULT_CODE_MODEL),
         )
 
 

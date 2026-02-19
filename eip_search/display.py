@@ -650,3 +650,206 @@ def _human_size(size: int) -> str:
 def print_error(message: str) -> None:
     """Print an error message."""
     console.print(f"\n[bold red]Error:[/bold red] {escape(message)}\n")
+
+
+# ---------------------------------------------------------------------------
+# Authors
+# ---------------------------------------------------------------------------
+
+def print_authors_list(data: dict) -> None:
+    """Print paginated author listing."""
+    total = data.get("total", 0)
+    page = data.get("page", 1)
+    total_pages = data.get("total_pages", 0)
+    items = data.get("items", [])
+
+    if not items:
+        console.print("\n[dim]No authors found.[/dim]\n")
+        return
+
+    table = Table(box=None, padding=(0, 2))
+    table.add_column("Name", style="bold")
+    table.add_column("Exploits", justify="right")
+    table.add_column("Handle", style="dim")
+
+    for a in items:
+        handle = f"@{a['handle']}" if a.get("handle") else ""
+        table.add_row(escape(a["name"]), f"{a['exploit_count']:,}", handle)
+
+    console.print()
+    console.print(Padding(table, (0, 2)))
+    console.print(f"\n  [dim]Page {page}/{total_pages} ({total:,} total authors)[/dim]\n")
+
+
+def print_author_detail(data: dict) -> None:
+    """Print author profile with their exploits."""
+    name = data.get("name", "?")
+    handle = data.get("handle")
+    count = data.get("exploit_count", 0)
+    since = (data.get("first_seen_at") or "?")[:10]
+    exploits = data.get("exploits", [])
+    total = data.get("total", count)
+    page = data.get("page", 1)
+    total_pages = data.get("total_pages", 1)
+
+    header = Text(f" {name}", style="bold")
+    if handle:
+        header.append(f"  @{handle}", style="dim")
+    console.print()
+    console.print(Panel(header, expand=False))
+    console.print(f"  Exploits: {count:,}  |  Active since: {since}")
+    console.print()
+
+    if not exploits:
+        console.print("  [dim]No exploits to display.[/dim]\n")
+        return
+
+    table = Table(box=None, padding=(0, 1))
+    table.add_column("ID", style="dim", justify="right")
+    table.add_column("CVE")
+    table.add_column("Sev", justify="center")
+    table.add_column("Source", style="dim")
+    table.add_column("Name")
+
+    for e in exploits:
+        cve = e.get("cve_id") or e.get("cve_title") or ""
+        sev = _severity_badge(e.get("severity_label"))
+        src = e.get("source", "")
+        name_str = e.get("source_id") or f"exploit-{e.get('id', '?')}"
+        table.add_row(str(e.get("id", "")), cve, sev, src, escape(name_str))
+
+    console.print(Padding(table, (0, 2)))
+    if total_pages > 1:
+        console.print(f"\n  [dim]Page {page}/{total_pages} ({total:,} total exploits)[/dim]")
+    console.print()
+
+
+# ---------------------------------------------------------------------------
+# CWEs
+# ---------------------------------------------------------------------------
+
+def print_cwe_list(data: dict) -> None:
+    """Print CWE category listing."""
+    total = data.get("total", 0)
+    items = data.get("items", [])
+
+    if not items:
+        console.print("\n[dim]No CWE data available.[/dim]\n")
+        return
+
+    table = Table(box=None, padding=(0, 2))
+    table.add_column("CWE", style="bold", justify="right")
+    table.add_column("Vulns", justify="right")
+    table.add_column("Name")
+
+    for c in items:
+        label = c.get("short_label") or c.get("name", "?")
+        if len(label) > 60:
+            label = label[:57] + "..."
+        table.add_row(c["cwe_id"], f"{c['vuln_count']:,}", escape(label))
+
+    console.print()
+    console.print(Padding(table, (0, 2)))
+    console.print(f"\n  [dim]{total} CWE categories with vulnerabilities[/dim]\n")
+
+
+def print_cwe_detail(data: dict) -> None:
+    """Print CWE detail."""
+    cwe_id = data.get("cwe_id", "?")
+    name = data.get("name", "?")
+    vuln_count = data.get("vuln_count", 0)
+
+    header = Text(f" {cwe_id}", style="bold")
+    header.append(f"  {name}", style="")
+    console.print()
+    console.print(Panel(header, expand=False))
+
+    meta = []
+    if data.get("short_label"):
+        meta.append(f"Short label: {data['short_label']}")
+    if data.get("likelihood"):
+        meta.append(f"Exploit likelihood: {data['likelihood']}")
+    meta.append(f"Vulnerabilities: {vuln_count:,}")
+    for m in meta:
+        console.print(f"  {m}")
+
+    parent = data.get("parent_cwe")
+    if parent:
+        console.print(f"  Parent: {parent['cwe_id']} ({parent['name']})")
+
+    desc = data.get("description")
+    if desc:
+        console.print()
+        console.print(Padding(Text(desc), (0, 2)))
+
+    console.print()
+
+
+# ---------------------------------------------------------------------------
+# Vendors / Products
+# ---------------------------------------------------------------------------
+
+def print_vendors_list(data: dict) -> None:
+    """Print vendor listing."""
+    total = data.get("total", 0)
+    items = data.get("items", [])
+
+    if not items:
+        console.print("\n[dim]No vendor data available.[/dim]\n")
+        return
+
+    table = Table(box=None, padding=(0, 2))
+    table.add_column("Vendor", style="bold")
+    table.add_column("Vulns", justify="right")
+
+    for v in items:
+        table.add_row(escape(v["vendor"]), f"{v['vuln_count']:,}")
+
+    console.print()
+    console.print(Padding(table, (0, 2)))
+    console.print(f"\n  [dim]{total} vendors tracked[/dim]\n")
+
+
+def print_products_list(data: dict) -> None:
+    """Print product listing for a vendor."""
+    vendor = data.get("vendor", "?")
+    total = data.get("total", 0)
+    items = data.get("items", [])
+
+    if not items:
+        console.print(f"\n[dim]No products found for vendor '{escape(vendor)}'.[/dim]\n")
+        return
+
+    table = Table(box=None, padding=(0, 2))
+    table.add_column("Product", style="bold")
+    table.add_column("Vulns", justify="right")
+
+    for p in items:
+        table.add_row(escape(p["product"]), f"{p['vuln_count']:,}")
+
+    console.print()
+    console.print(Padding(table, (0, 2)))
+    console.print(f"\n  [dim]{total} products for {escape(vendor)}[/dim]")
+    console.print(f"  [dim]Use: eip-search search --vendor {escape(vendor)} --product <name>[/dim]\n")
+
+
+# ---------------------------------------------------------------------------
+# Lookup
+# ---------------------------------------------------------------------------
+
+def print_lookup_result(data: dict) -> None:
+    """Print alt-ID lookup result."""
+    alt_id = data.get("alt_id", "?")
+    cve = data.get("cve_id") or data.get("eip_id", "?")
+    title = data.get("title") or "No title"
+    sev = _severity_badge(data.get("severity_label"))
+    cvss = data.get("cvss_v3_score")
+    cvss_str = f"CVSS {cvss:.1f}" if cvss is not None else ""
+
+    console.print()
+    console.print(f"  [bold]{escape(alt_id)}[/bold] [dim]\u2192[/dim] [bold cyan]{escape(cve)}[/bold cyan]")
+    console.print(f"  {escape(title)}  ", end="")
+    console.print(sev, end="")
+    if cvss_str:
+        console.print(f"  {cvss_str}", end="")
+    console.print("\n")

@@ -24,6 +24,7 @@ Part of the same project family:
 - Combine CVSS, EPSS, KEV, and exploit quality in one view
 - Surface trusted exploit sources first and flag trojans clearly
 - Pull Nuclei templates plus Shodan/FOFA/Google recon dorks
+- Browse authors, CWEs, vendors, and products — resolve EDB/GHSA IDs to CVEs
 
 ## Why eip-search?
 
@@ -129,7 +130,7 @@ pip install -e .
 | `make build` | Python 3, `build` module (`pip install build`) |
 | `make check` / `make pypi` | `twine` (`pip install twine`) |
 | `make deb` | Docker |
-| `make tag-release` | Python 3 (version bump only — Gitea Actions handles the rest) |
+| `make tag-release` | Python 3 (version bump only — Forgejo Actions handles the rest) |
 | `make release` | All of the above + `tea` CLI ([codeberg.org/gitea/tea](https://codeberg.org/gitea/tea)) |
 
 Install everything at once:
@@ -173,9 +174,9 @@ dist/eip-search_0.2.0_kali-rolling_all.deb
 
 ### Releasing
 
-**One-time setup:** add `PYPI_API_TOKEN` and `GITEA_TOKEN` as repository secrets in Gitea (Settings → Actions → Secrets).
+**One-time setup:** add `PYPI_API_TOKEN` and `RELEASE_TOKEN` as repository secrets in Codeberg (Settings → Actions → Secrets).
 
-**Automated release (recommended)** — bumps version, commits, tags, and pushes. Gitea Actions builds PyPI packages + all 4 `.deb`s, uploads to PyPI, and creates a Gitea release with artifacts attached:
+**Automated release (recommended)** — bumps version, commits, tags, and pushes. Forgejo Actions builds PyPI packages + all 4 `.deb`s, uploads to PyPI, and creates a Codeberg release with artifacts attached:
 
 ```bash
 make tag-release VERSION=0.2.0
@@ -434,6 +435,39 @@ Tip: eip-search view <id> | eip-search download <id> -x
 
 Every result includes the exploit ID, associated CVE, severity, source, language, and GitHub stars. Use the exploit ID directly with `view` or `download`.
 
+## Reference Data
+
+Browse authors, CWEs, vendors, and products, or resolve alternate identifiers to CVEs:
+
+```bash
+# Top exploit authors
+eip-search authors
+
+# Author profile with their exploits
+eip-search author Metasploit
+eip-search author "Chocapikk" --page 2
+
+# CWE categories ranked by vuln count
+eip-search cwes
+
+# CWE detail
+eip-search cwe 79
+eip-search cwe CWE-89
+
+# Top vendors by vulnerability count
+eip-search vendors
+
+# Products for a vendor (discover exact CPE names for filtering)
+eip-search products apache
+eip-search products microsoft
+
+# Resolve ExploitDB or GHSA ID to its CVE
+eip-search lookup EDB-45961
+eip-search lookup GHSA-jfh8-c2jp-5v3q
+```
+
+The `products` command is especially useful for discovering exact product names to use with `--product` filters. Product names follow CPE conventions (e.g. `http_server` not `apache httpd`, `exchange_server` not `exchange`).
+
 ## View Exploit Source Code
 
 Read exploit code directly in your terminal with syntax highlighting. Pass an exploit ID or a CVE ID:
@@ -628,6 +662,13 @@ $ eip-search stats
 | `eip-search view ID-or-CVE` | Syntax-highlighted exploit source code |
 | `eip-search download ID-or-CVE` | Download exploit code as ZIP |
 | `eip-search stats` | Platform-wide statistics |
+| `eip-search authors` | Top exploit authors ranked by exploit count |
+| `eip-search author NAME` | Author profile with their exploits |
+| `eip-search cwes` | CWE categories ranked by vulnerability count |
+| `eip-search cwe ID` | CWE detail (accepts `79` or `CWE-79`) |
+| `eip-search vendors` | Top vendors ranked by vulnerability count |
+| `eip-search products VENDOR` | Products for a vendor (discover CPE names for filtering) |
+| `eip-search lookup ALT-ID` | Resolve EDB/GHSA identifier to CVE |
 
 The `view` and `download` commands accept either an exploit ID (e.g. `77423`) or a CVE ID (e.g. `CVE-2024-3400`). When given a CVE, they show an interactive picker ranked by exploit quality.
 

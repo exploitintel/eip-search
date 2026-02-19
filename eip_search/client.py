@@ -157,6 +157,20 @@ def get_exploit_code(exploit_id: int, file_path: str) -> str:
     return data.get("content", "")
 
 
+def get_exploit_image(exploit_id: int, filename: str) -> bytes:
+    """Download raw image bytes for a file in an exploit."""
+    with httpx.Client(timeout=TIMEOUT, headers=_build_headers(), follow_redirects=True) as client:
+        resp = client.get(
+            _api_url(f"/api/v1/exploits/{exploit_id}/image"),
+            params={"file": filename},
+        )
+    if resp.status_code == 404:
+        raise APIError(404, f"Image not found: {filename}")
+    if resp.status_code >= 400:
+        raise APIError(resp.status_code, f"Failed to fetch image: HTTP {resp.status_code}")
+    return resp.content
+
+
 MAX_DOWNLOAD_SIZE = 50 * 1024 * 1024  # 50 MB hard cap
 
 
@@ -220,4 +234,58 @@ def get_health() -> dict[str, Any]:
     """Get health check info."""
     with httpx.Client(timeout=TIMEOUT, headers=_build_headers(), follow_redirects=True) as client:
         resp = client.get(_api_url("/api/v1/health"))
+    return _handle_response(resp)
+
+
+def list_authors(params: dict[str, Any]) -> dict[str, Any]:
+    """List exploit authors ranked by exploit count."""
+    clean = {k: v for k, v in params.items() if v is not None}
+    with httpx.Client(timeout=TIMEOUT, headers=_build_headers(), follow_redirects=True) as client:
+        resp = client.get(_api_url("/api/v1/authors"), params=clean)
+    return _handle_response(resp)
+
+
+def get_author(name: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Get author profile with their exploits."""
+    from urllib.parse import quote
+    clean = {k: v for k, v in (params or {}).items() if v is not None}
+    with httpx.Client(timeout=TIMEOUT, headers=_build_headers(), follow_redirects=True) as client:
+        resp = client.get(_api_url(f"/api/v1/authors/{quote(name, safe='')}"), params=clean)
+    return _handle_response(resp)
+
+
+def list_cwes() -> dict[str, Any]:
+    """List CWE categories ranked by vulnerability count."""
+    with httpx.Client(timeout=TIMEOUT, headers=_build_headers(), follow_redirects=True) as client:
+        resp = client.get(_api_url("/api/v1/cwe"))
+    return _handle_response(resp)
+
+
+def get_cwe(cwe_id: str) -> dict[str, Any]:
+    """Get CWE detail by ID (e.g. 'CWE-79' or '79')."""
+    from urllib.parse import quote
+    with httpx.Client(timeout=TIMEOUT, headers=_build_headers(), follow_redirects=True) as client:
+        resp = client.get(_api_url(f"/api/v1/cwe/{quote(cwe_id, safe='')}"))
+    return _handle_response(resp)
+
+
+def list_vendors() -> dict[str, Any]:
+    """List vendors ranked by vulnerability count."""
+    with httpx.Client(timeout=TIMEOUT, headers=_build_headers(), follow_redirects=True) as client:
+        resp = client.get(_api_url("/api/v1/vendors"))
+    return _handle_response(resp)
+
+
+def list_vendor_products(vendor: str) -> dict[str, Any]:
+    """List products for a specific vendor."""
+    from urllib.parse import quote
+    with httpx.Client(timeout=TIMEOUT, headers=_build_headers(), follow_redirects=True) as client:
+        resp = client.get(_api_url(f"/api/v1/vendors/{quote(vendor, safe='')}/products"))
+    return _handle_response(resp)
+
+
+def lookup_alt_id(alt_id: str) -> dict[str, Any]:
+    """Resolve an alternate ID (EDB-XXXXX, GHSA-XXXXX) to its CVE."""
+    with httpx.Client(timeout=TIMEOUT, headers=_build_headers(), follow_redirects=True) as client:
+        resp = client.get(_api_url("/api/v1/lookup"), params={"alt_id": alt_id})
     return _handle_response(resp)
