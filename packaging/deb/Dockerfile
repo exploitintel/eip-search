@@ -49,7 +49,7 @@ RUN mkdir /out && fpm \
     -v "${VERSION}" \
     -a all \
     --description "CLI intelligence tool for the Exploit Intelligence Platform — a modern searchsploit replacement" \
-    --url "https://github.com/exploit-intel/eip-search" \
+    --url "https://codeberg.org/exploit-intel/eip-search" \
     --license "MIT" \
     --maintainer "Exploit Intelligence Platform" \
     --vendor "Exploit Intelligence Platform" \

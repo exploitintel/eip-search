@@ -7,7 +7,7 @@ on:
 
 jobs:
   release:
-    runs-on: codeberg-small
+    runs-on: codeberg-medium
     steps:
       - name: Checkout
         uses: https://code.forgejo.org/actions/checkout@v4
@@ -26,13 +26,14 @@ jobs:
       - name: Validate packages
         run: make check
 
-      - name: Build .deb packages
+      - name: Setup Podman as Docker alias
         run: |
-          if command -v docker &>/dev/null; then
-            make deb
-          else
-            echo "Docker not available — skipping .deb build (build locally with: make deb)"
+          if ! command -v docker &>/dev/null && command -v podman &>/dev/null; then
+            ln -s $(command -v podman) /usr/local/bin/docker
           fi
+
+      - name: Build .deb packages
+        run: make deb
 
       - name: Upload to PyPI
         env:
