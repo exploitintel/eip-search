@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: pip install build twine
+
+      - name: Build PyPI packages
+        run: make build
+
+      - name: Validate packages
+        run: make check
+
+      - name: Build .deb packages
+        run: make deb
+
+      - name: Upload to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: make pypi
+
+      - name: Create Gitea Release
+        env:
+          GITEA_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          API_URL="${{ github.server_url }}/api/v1/repos/${{ github.repository }}"
+
+          # Create release
+          RELEASE_ID=$(curl -sf -X POST \
+            -H "Authorization: token ${GITEA_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"tag_name\": \"${TAG}\", \"name\": \"${TAG}\", \"draft\": false, \"prerelease\": false}" \
+            "${API_URL}/releases" | jq -r '.id')
+
+          echo "Created release ${TAG} (id: ${RELEASE_ID})"
+
+          # Upload assets
+          for file in dist/*.deb dist/*.whl dist/*.tar.gz; do
+            [ -f "$file" ] || continue
+            echo "Uploading $(basename "$file")..."
+            curl -sf -X POST \
+              -H "Authorization: token ${GITEA_TOKEN}" \
+              -F "attachment=@${file}" \
+              "${API_URL}/releases/${RELEASE_ID}/assets"
+          done

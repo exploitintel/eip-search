@@ -35,7 +35,7 @@ eip-search = "eip_search.cli:app"
 
 [project.urls]
 Homepage = "https://exploit-intel.com"
-Repository = "https://github.com/exploit-intel/eip-search"
+Repository = "https://gitea.com/exploit-intel/eip-search"
 
 [tool.setuptools.packages.find]
 include = ["eip_search*"]

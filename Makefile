@@ -7,8 +7,8 @@ require = $(if $(shell command -v $(1) 2>/dev/null),,$(error "$(1)" not found. $
 #   make release VERSION=0.2.0
 #
 # This will: bump version, clean, build PyPI + .debs, upload to PyPI,
-# git commit, tag, push, and create a GitHub release with .debs attached.
-# Requires: pip install build twine, Docker, gh CLI
+# git commit, tag, push, and create a Gitea release with .debs attached.
+# Requires: pip install build twine, Docker, tea CLI
 
 release:
 ifndef VERSION
@@ -17,7 +17,7 @@ endif
 	$(call require,python3,Install Python 3)
 	$(call require,twine,pip install twine)
 	$(call require,docker,Install Docker Desktop or docker-ce)
-	$(call require,gh,Install GitHub CLI: https://cli.github.com)
+	$(call require,tea,Install Gitea CLI: https://gitea.com/gitea/tea)
 	@echo ""
 	@echo "==> Releasing eip-search $(VERSION)"
 	@echo ""
@@ -43,12 +43,12 @@ endif
 	git tag v$(VERSION)
 	git push
 	git push --tags
-	@# 7. GitHub release with .debs attached
-	@echo "--- Creating GitHub release"
-	gh release create v$(VERSION) \
+	@# 7. Gitea release with .debs attached
+	@echo "--- Creating Gitea release"
+	tea release create \
+		--tag v$(VERSION) \
 		--title "v$(VERSION)" \
-		--generate-notes \
-		dist/eip-search_$(VERSION)_*_all.deb
+		--asset dist/eip-search_$(VERSION)_*_all.deb
 	@echo ""
 	@echo "==> eip-search $(VERSION) released!"
 	@echo "    https://pypi.org/project/eip-search/$(VERSION)/"
@@ -57,9 +57,9 @@ endif
 # ── Tag a release (CI builds + uploads) ──────────────────────────────────────
 #   make tag-release VERSION=0.2.0
 #
-# Bumps version, commits, tags, and pushes. GitHub Actions handles
+# Bumps version, commits, tags, and pushes. Gitea Actions handles
 # building PyPI packages, .debs, uploading to PyPI, and creating
-# the GitHub release.
+# the Gitea release.
 
 tag-release:
 ifndef VERSION
@@ -77,8 +77,7 @@ endif
 	git push
 	git push --tags
 	@echo ""
-	@echo "==> Tag v$(VERSION) pushed — GitHub Actions will build and release."
-	@echo "    Watch progress: gh run watch"
+	@echo "==> Tag v$(VERSION) pushed — Gitea Actions will build and release."
 	@echo ""
 
 # ── Build sdist + wheel ───────────────────────────────────────────────────────

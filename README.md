@@ -10,11 +10,11 @@ A modern **searchsploit replacement** powered by the [Exploit Intelligence Platf
 
 Search 370K+ vulnerabilities and 105K+ exploits from 4 sources with risk intelligence, exploit quality ranking, Nuclei scanner integration, and trojan warnings — all from your terminal.
 
-![eip-search CLI screenshot](https://raw.githubusercontent.com/exploit-intel/eip-search/main/eip-search.png)
+![eip-search CLI screenshot](https://gitea.com/exploit-intel/eip-search/raw/branch/main/eip-search.png)
 
 Part of the same project family:
-- [`eip-search`](https://github.com/exploit-intel/eip-search) — terminal client
-- [`eip-mcp`](https://github.com/exploit-intel/eip-mcp) — MCP server for AI assistants
+- [`eip-search`](https://gitea.com/exploit-intel/eip-search) — terminal client
+- [`eip-mcp`](https://gitea.com/exploit-intel/eip-mcp) — MCP server for AI assistants
 
 ## Highlights
 
@@ -112,7 +112,7 @@ pipx install eip-search
 ### From Source (all platforms)
 
 ```bash
-git clone git@github.com:exploit-intel/eip-search.git
+git clone git@gitea.com:exploit-intel/eip-search.git
 cd eip-search
 python3 -m venv .venv
 source .venv/bin/activate      # Linux/macOS
@@ -129,15 +129,15 @@ pip install -e .
 | `make build` | Python 3, `build` module (`pip install build`) |
 | `make check` / `make pypi` | `twine` (`pip install twine`) |
 | `make deb` | Docker |
-| `make tag-release` | Python 3 (version bump only — CI handles the rest) |
-| `make release` | All of the above + `gh` CLI ([cli.github.com](https://cli.github.com)) |
+| `make tag-release` | Python 3 (version bump only — Gitea Actions handles the rest) |
+| `make release` | All of the above + `tea` CLI ([gitea.com/gitea/tea](https://gitea.com/gitea/tea)) |
 
 Install everything at once:
 
 ```bash
 pip install build twine
 # Docker: https://docs.docker.com/get-docker/
-# gh CLI: https://cli.github.com
+# tea CLI: https://gitea.com/gitea/tea
 ```
 
 The Makefile checks for each dependency before running and will tell you exactly what's missing.
@@ -173,9 +173,9 @@ dist/eip-search_0.2.0_kali-rolling_all.deb
 
 ### Releasing
 
-**One-time setup:** add a `PYPI_API_TOKEN` repository secret in GitHub (Settings → Secrets → Actions).
+**One-time setup:** add `PYPI_API_TOKEN` and `GITEA_TOKEN` as repository secrets in Gitea (Settings → Actions → Secrets).
 
-**Automated release (recommended)** — bumps version, commits, tags, and pushes. GitHub Actions builds PyPI packages + all 4 `.deb`s, uploads to PyPI, and creates a GitHub release with artifacts attached:
+**Automated release (recommended)** — bumps version, commits, tags, and pushes. Gitea Actions builds PyPI packages + all 4 `.deb`s, uploads to PyPI, and creates a Gitea release with artifacts attached:
 
 ```bash
 make tag-release VERSION=0.2.0
