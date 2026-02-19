@@ -26,14 +26,53 @@ jobs:
       - name: Validate packages
         run: make check
 
-      - name: Setup Podman as Docker alias
-        run: |
-          if ! command -v docker &>/dev/null && command -v podman &>/dev/null; then
-            ln -s $(command -v podman) /usr/local/bin/docker
-          fi
-
       - name: Build .deb packages
-        run: make deb
+        run: |
+          VERSION=$(grep '^__version__' eip_search/__init__.py | cut -d'"' -f2)
+
+          # Install fpm
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends ruby ruby-dev gcc make
+          sudo gem install --no-document fpm
+
+          # Install into a venv
+          python3 -m venv /opt/eip-search
+          /opt/eip-search/bin/pip install --no-cache-dir dist/*.whl
+
+          # Strip unnecessary files
+          find /opt/eip-search -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+          rm -rf /opt/eip-search/lib/python*/site-packages/pip* \
+                 /opt/eip-search/lib/python*/site-packages/setuptools* \
+                 /opt/eip-search/lib/python*/site-packages/pkg_resources*
+
+          # Create CLI symlink
+          sudo mkdir -p /usr/local/bin
+          sudo ln -sf /opt/eip-search/bin/eip-search /usr/local/bin/eip-search
+
+          # Build .deb for each distro tag
+          for DISTRO_TAG in ubuntu-jammy ubuntu-noble debian-bookworm kali-rolling; do
+            fpm \
+              -s dir \
+              -t deb \
+              -n eip-search \
+              -v "${VERSION}" \
+              -a all \
+              --description "CLI intelligence tool for the Exploit Intelligence Platform" \
+              --url "https://codeberg.org/exploit-intel/eip-search" \
+              --license "MIT" \
+              --maintainer "Exploit Intelligence Platform" \
+              --vendor "Exploit Intelligence Platform" \
+              --category utils \
+              --depends python3 \
+              --deb-no-default-config-files \
+              --before-install packaging/deb/preinst.sh \
+              --after-remove packaging/deb/postrm.sh \
+              -p "dist/eip-search_${VERSION}_${DISTRO_TAG}_all.deb" \
+              -C / \
+              opt/eip-search \
+              usr/local/bin/eip-search
+          done
+
+          ls -lh dist/*.deb
 
       - name: Upload to PyPI
         env:
