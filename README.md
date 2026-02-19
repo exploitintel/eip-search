@@ -10,11 +10,11 @@ A modern **searchsploit replacement** powered by the [Exploit Intelligence Platf
 
 Search 370K+ vulnerabilities and 105K+ exploits from 4 sources with risk intelligence, exploit quality ranking, Nuclei scanner integration, and trojan warnings — all from your terminal.
 
-![eip-search CLI screenshot](https://gitea.com/exploit-intel/eip-search/raw/branch/main/eip-search.png)
+![eip-search CLI screenshot](https://codeberg.org/exploit-intel/eip-search/raw/branch/main/eip-search.png)
 
 Part of the same project family:
-- [`eip-search`](https://gitea.com/exploit-intel/eip-search) — terminal client
-- [`eip-mcp`](https://gitea.com/exploit-intel/eip-mcp) — MCP server for AI assistants
+- [`eip-search`](https://codeberg.org/exploit-intel/eip-search) — terminal client
+- [`eip-mcp`](https://codeberg.org/exploit-intel/eip-mcp) — MCP server for AI assistants
 
 ## Highlights
 
@@ -112,7 +112,7 @@ pipx install eip-search
 ### From Source (all platforms)
 
 ```bash
-git clone git@gitea.com:exploit-intel/eip-search.git
+git clone git@codeberg.org:exploit-intel/eip-search.git
 cd eip-search
 python3 -m venv .venv
 source .venv/bin/activate      # Linux/macOS
@@ -130,14 +130,14 @@ pip install -e .
 | `make check` / `make pypi` | `twine` (`pip install twine`) |
 | `make deb` | Docker |
 | `make tag-release` | Python 3 (version bump only — Gitea Actions handles the rest) |
-| `make release` | All of the above + `tea` CLI ([gitea.com/gitea/tea](https://gitea.com/gitea/tea)) |
+| `make release` | All of the above + `tea` CLI ([codeberg.org/gitea/tea](https://codeberg.org/gitea/tea)) |
 
 Install everything at once:
 
 ```bash
 pip install build twine
 # Docker: https://docs.docker.com/get-docker/
-# tea CLI: https://gitea.com/gitea/tea
+# tea CLI: https://codeberg.org/gitea/tea
 ```
 
 The Makefile checks for each dependency before running and will tell you exactly what's missing.
