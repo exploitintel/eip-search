@@ -630,41 +630,77 @@ def generate(
         )
         no_vision = True
 
-    # -- Find writeup exploit and fetch text --
-    writeup_exploit = None
+    # -- Gather exploit context: writeup text, existing code, images --
+    writeup_text = None
+    existing_code = None
+    source_exploit = None
+
+    # Prefer writeup exploits for text + images
     for e in vuln.exploits:
         if e.llm_classification == "writeup":
-            writeup_exploit = e
+            source_exploit = e
             break
-    if not writeup_exploit and vuln.exploits:
-        writeup_exploit = vuln.exploits[0]
 
-    writeup_text = None
-    if writeup_exploit:
+    # Also look for exploits with actual code
+    code_exploit = None
+    for e in vuln.exploits:
+        if e.has_code and e.llm_classification not in ("trojan", "suspicious"):
+            code_exploit = e
+            break
+
+    if not source_exploit:
+        source_exploit = code_exploit or (vuln.exploits[0] if vuln.exploits else None)
+
+    # Fetch writeup text from the source exploit
+    if source_exploit:
         files = _api_call(
-            client.list_exploit_files, writeup_exploit.id,
+            client.list_exploit_files, source_exploit.id,
             spinner_text="Listing exploit files...",
         )
         text_files = [f for f in files if f.file_type != "image"]
         if text_files:
             writeup_text = _api_call(
-                client.get_exploit_code, writeup_exploit.id, text_files[0].path,
+                client.get_exploit_code, source_exploit.id, text_files[0].path,
                 spinner_text="Fetching writeup text...",
             )
             if writeup_text:
-                console.print(f"  Writeup: {len(writeup_text)} chars from exploit {writeup_exploit.id}")
+                console.print(f"  Writeup: {len(writeup_text)} chars from exploit {source_exploit.id}")
+
+    # Fetch existing exploit code (if different from writeup source)
+    if code_exploit and code_exploit.id != (source_exploit.id if source_exploit else None):
+        code_files = _api_call(
+            client.list_exploit_files, code_exploit.id,
+            spinner_text="Listing code files...",
+        )
+        code_text_files = [f for f in code_files if f.file_type != "image"]
+        if code_text_files:
+            existing_code = _api_call(
+                client.get_exploit_code, code_exploit.id, code_text_files[0].path,
+                spinner_text="Fetching existing exploit code...",
+            )
+            if existing_code:
+                console.print(f"  Existing code: {len(existing_code)} chars from exploit {code_exploit.id}")
+    elif code_exploit and not writeup_text:
+        # Source exploit IS the code exploit and we already fetched its text
+        # but it wasn't labeled as writeup — treat it as existing code
+        if writeup_text:
+            existing_code = writeup_text
+            writeup_text = None
+            console.print(f"  [dim](treating as existing code to rewrite)[/dim]")
 
     # -- Vision stage --
     image_descs: list[dict] = []
-    if not no_vision and writeup_exploit:
+    if not no_vision and source_exploit:
         all_files = _api_call(
-            client.list_exploit_files, writeup_exploit.id,
+            client.list_exploit_files, source_exploit.id,
             spinner_text="Listing exploit files...",
         )
         image_files = [f for f in all_files if f.file_type == "image"]
 
         if image_files:
             console.print(f"\n  Analyzing {len(image_files)} screenshot{'s' if len(image_files) != 1 else ''}...")
+
+            eid_for_images = source_exploit.id
 
             def _on_image_progress(filename: str, desc: str, elapsed: float):
                 preview = desc[:100].replace("\n", " ")
@@ -674,7 +710,7 @@ def generate(
                     console.print(f"    {escape(filename)}: {escape(preview)}... ({elapsed:.1f}s)")
 
             def _fetch_image(filename: str) -> bytes:
-                return client.get_exploit_image(writeup_exploit.id, filename)
+                return client.get_exploit_image(eid_for_images, filename)
 
             image_descs = describe_images(
                 image_files,
@@ -690,7 +726,7 @@ def generate(
             console.print("  [dim]No screenshots found for this exploit[/dim]")
 
     # -- Build prompt + generate --
-    prompt = build_prompt(vuln, writeup_text, image_descs)
+    prompt = build_prompt(vuln, writeup_text, image_descs, existing_code)
     console.print(f"\n  Prompt: {len(prompt)} chars")
 
     with Status(f"Generating PoC with {code_model_name}...", console=err_console, spinner="dots"):

@@ -20,6 +20,7 @@ Part of the same project family:
 
 - Search 370K+ vulnerabilities and 105K+ exploits from one CLI
 - Browse exploits directly by source, language, vendor, or attack type
+- **Generate PoC exploits** for any CVE using a local LLM (Ollama) with optional vision pipeline for writeup screenshots
 - Download exploit code by CVE ID — interactive picker selects the best match
 - Combine CVSS, EPSS, KEV, and exploit quality in one view
 - Surface trusted exploit sources first and flag trojans clearly
@@ -649,6 +650,75 @@ $ eip-search stats
   └──────────────────────────────┴─────────────────────┘
 ```
 
+## Generate Exploits with Local LLM
+
+Generate a proof-of-concept exploit for any CVE using a local [Ollama](https://ollama.com) instance. The tool fetches all available intelligence from the platform — writeup text, existing exploit code, and screenshots — then uses a two-stage LLM pipeline to produce a clean, minimal Python PoC.
+
+```bash
+# Check feasibility first (no Ollama needed)
+$ eip-search generate CVE-2026-2686 --check
+```
+```
+  CVE-2026-2686 — SECCN Dingcheng G10 Command Injection
+  CVSS 9.8 | RCE | trivial | Feasibility: EXCELLENT (11)
+  Reasons: web-based (RCE), trivial, has writeup, HTTP details in summary, known CWE pattern
+  Files: 1 text, 8 screenshots
+```
+
+```bash
+# Generate the exploit
+$ eip-search generate CVE-2026-2686 -o exploit.py
+```
+```
+  CVE-2026-2686 — SECCN Dingcheng G10 Command Injection
+  CVSS 9.8 | RCE | trivial | Feasibility: EXCELLENT (11)
+
+  Analyzing 8 screenshots...
+    img-001: telnet session, root shell on BusyBox (8.9s)
+    img-003: POST /cgi-bin/session_login.cgi with injection payload (10.7s)
+    img-008: Burp capture with full request headers (16.9s)
+    2 screenshots skipped (no actionable details)
+
+  Generating PoC with kimi-k2:1t-cloud... done (11s)
+
+  (syntax-highlighted Python exploit)
+
+  Saved: exploit.py
+```
+
+The generator works in three modes depending on what's available:
+- **Writeup + screenshots** → vision model extracts technical details from images, code model generates PoC from enriched context
+- **Existing exploit code** → code model rewrites/fixes it into a clean, standardized Python PoC
+- **CVE description only** → generates from NVD description and LLM analysis (lower quality)
+
+Generated exploits are minimal proofs of concept (inject `id` for RCE, extract `@@version` for SQLi) — no backdoors, reverse shells, or weaponization. Each script is clearly marked as LLM-generated and untested.
+
+**Requirements:** [Ollama](https://ollama.com) running locally with a code model pulled. Vision model is optional (used for screenshot analysis).
+
+```bash
+# Install Ollama, then pull models
+ollama pull kimi-k2:1t-cloud                   # code generation (required)
+ollama pull qwen3-vl:235b-instruct-cloud       # screenshot analysis (optional)
+```
+
+```bash
+# Options
+eip-search generate CVE-ID                     # full pipeline (vision + code)
+eip-search generate CVE-ID --check             # feasibility check only
+eip-search generate CVE-ID --no-vision         # skip screenshots (faster)
+eip-search generate CVE-ID -m glm-5:cloud      # override code model
+eip-search generate CVE-ID -o exploit.py       # save to file
+```
+
+Configure defaults in `~/.eip-search.toml`:
+
+```toml
+[generate]
+ollama_url = "http://127.0.0.1:11434"
+code_model = "kimi-k2:1t-cloud"
+vision_model = "qwen3-vl:235b-instruct-cloud"
+```
+
 ## All Commands
 
 | Command | Description |
@@ -657,6 +727,7 @@ $ eip-search stats
 | `eip-search search "query" [filters]` | Search vulnerabilities with full filter support |
 | `eip-search exploits "query" [filters]` | Browse/search exploits directly |
 | `eip-search info CVE-ID` | Full intelligence brief for a vulnerability |
+| `eip-search generate CVE-ID` | Generate a PoC exploit using local LLM (requires Ollama) |
 | `eip-search triage [filters]` | Risk-sorted view of what to worry about |
 | `eip-search nuclei CVE-ID` | Nuclei templates + Shodan/FOFA/Google dorks |
 | `eip-search view ID-or-CVE` | Syntax-highlighted exploit source code |
