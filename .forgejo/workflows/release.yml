@@ -105,3 +105,22 @@ jobs:
               -F "attachment=@${file}" \
               "${API_URL}/releases/${RELEASE_ID}/assets"
           done
+
+      - name: Upload to APT repo
+        env:
+          REPO_SSH_KEY: ${{ secrets.REPO_SSH_KEY }}
+        run: |
+          if [ -z "$REPO_SSH_KEY" ]; then
+            echo "REPO_SSH_KEY not set, skipping APT repo upload"
+            exit 0
+          fi
+
+          mkdir -p ~/.ssh
+          echo "$REPO_SSH_KEY" > ~/.ssh/repo_key
+          chmod 600 ~/.ssh/repo_key
+          ssh-keyscan REDACTED >> ~/.ssh/known_hosts 2>/dev/null
+
+          scp -i ~/.ssh/repo_key dist/*.deb root@REDACTED:/var/www/apt/incoming/
+          ssh -i ~/.ssh/repo_key root@REDACTED "bash /root/upload-debs.sh"
+
+          rm -f ~/.ssh/repo_key

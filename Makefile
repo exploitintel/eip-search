@@ -1,4 +1,4 @@
-.PHONY: release tag-release build clean check deb pypi
+.PHONY: release tag-release build clean check deb pypi upload-repo
 
 # ── Dependency checks ────────────────────────────────────────────────────────
 require = $(if $(shell command -v $(1) 2>/dev/null),,$(error "$(1)" not found. $(2)))
@@ -43,7 +43,9 @@ endif
 	git tag v$(VERSION)
 	git push
 	git push --tags
-	@# 7. Codeberg release with .debs attached
+	@# 7. Upload to APT repo
+	$(MAKE) upload-repo
+	@# 8. Codeberg release with .debs attached
 	@echo "--- Creating Codeberg release"
 	tea release create \
 		--tag v$(VERSION) \
@@ -103,6 +105,14 @@ pypi:
 	$(call require,twine,pip install twine)
 	@echo "--- Uploading to PyPI"
 	twine upload dist/*.whl dist/*.tar.gz
+
+# ── Upload .debs to APT repo server ──────────────────────────────────────────
+#   make upload-repo       — upload all .debs in dist/ to repo.exploit-intel.com
+upload-repo:
+	@echo "--- Uploading .debs to APT repo"
+	@ls dist/*.deb >/dev/null 2>&1 || { echo "No .deb files in dist/. Run 'make deb' first."; exit 1; }
+	scp dist/*.deb root@REDACTED:/var/www/apt/incoming/
+	ssh root@REDACTED "bash /root/upload-debs.sh"
 
 # ── Build .deb package(s) (requires Docker) ──────────────────────────────────
 #   make deb              — build all 4 distros
