@@ -34,9 +34,18 @@ jobs:
           sudo apt-get update && sudo apt-get install -y --no-install-recommends ruby ruby-dev gcc make
           sudo gem install --no-document fpm
 
-          # Install into a venv
-          python3 -m venv /opt/eip-search
+          # Create venv with system python, not CI python
+          sudo /usr/bin/python3 -m venv /opt/eip-search
           /opt/eip-search/bin/pip install --no-cache-dir dist/*.whl
+
+          # Fix shebangs to use /usr/bin/python3 (portable across targets)
+          find /opt/eip-search/bin -type f -exec grep -l '#!/opt/hostedtoolcache' {} \; 2>/dev/null | \
+            xargs -r sed -i '1s|#!/opt/hostedtoolcache[^ ]*/python3|#!/opt/eip-search/bin/python3|'
+
+          # Fix venv symlinks to point to /usr/bin/python3
+          rm -f /opt/eip-search/bin/python3 /opt/eip-search/bin/python
+          ln -s /usr/bin/python3 /opt/eip-search/bin/python3
+          ln -s python3 /opt/eip-search/bin/python
 
           # Strip unnecessary files
           find /opt/eip-search -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
