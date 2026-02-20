@@ -10,7 +10,9 @@ FILTER="${1:-}"
 DISTROS=(
     "ubuntu-jammy|ubuntu:22.04|ubuntu-jammy"
     "ubuntu-noble|ubuntu:24.04|ubuntu-noble"
+    "ubuntu-plucky|ubuntu:25.04|ubuntu-plucky"
     "debian-bookworm|debian:12|debian-bookworm"
+    "debian-trixie|debian:13|debian-trixie"
     "kali|kalilinux/kali-rolling|kali-rolling"
 )
 
@@ -54,7 +56,7 @@ for entry in "${DISTROS[@]}"; do
 done
 
 if [[ ${built} -eq 0 ]]; then
-    echo "ERROR: Unknown distro '${FILTER}'. Available: ubuntu-jammy, ubuntu-noble, debian-bookworm, kali" >&2
+    echo "ERROR: Unknown distro '${FILTER}'. Available: ubuntu-jammy, ubuntu-noble, ubuntu-plucky, debian-bookworm, debian-trixie, kali" >&2
     exit 1
 fi
 
