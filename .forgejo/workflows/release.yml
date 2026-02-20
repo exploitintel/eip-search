@@ -58,11 +58,13 @@ jobs:
           sudo ln -sf /opt/eip-search/bin/eip-search /usr/local/bin/eip-search
 
           # Build .deb for each distro (version suffix ensures unique pool files)
-          for DISTRO_TAG in ubuntu-jammy ubuntu-noble debian-bookworm kali-rolling; do
+          for DISTRO_TAG in ubuntu-jammy ubuntu-noble ubuntu-plucky debian-bookworm debian-trixie kali-rolling; do
             case "$DISTRO_TAG" in
               ubuntu-jammy)     SUITE=jammy ;;
               ubuntu-noble)     SUITE=noble ;;
+              ubuntu-plucky)    SUITE=plucky ;;
               debian-bookworm)  SUITE=bookworm ;;
+              debian-trixie)    SUITE=trixie ;;
               kali-rolling)     SUITE=kali-rolling ;;
             esac
             DEB_VERSION="${VERSION}~${SUITE}"
