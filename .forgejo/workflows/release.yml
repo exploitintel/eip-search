@@ -57,13 +57,21 @@ jobs:
           sudo mkdir -p /usr/local/bin
           sudo ln -sf /opt/eip-search/bin/eip-search /usr/local/bin/eip-search
 
-          # Build .deb for each distro tag
+          # Build .deb for each distro (version suffix ensures unique pool files)
+          declare -A DISTRO_SUITE=(
+            [ubuntu-jammy]=jammy
+            [ubuntu-noble]=noble
+            [debian-bookworm]=bookworm
+            [kali-rolling]=kali-rolling
+          )
           for DISTRO_TAG in ubuntu-jammy ubuntu-noble debian-bookworm kali-rolling; do
+            SUITE="${DISTRO_SUITE[$DISTRO_TAG]}"
+            DEB_VERSION="${VERSION}~${SUITE}"
             fpm \
               -s dir \
               -t deb \
               -n eip-search \
-              -v "${VERSION}" \
+              -v "${DEB_VERSION}" \
               -a all \
               --description "CLI intelligence tool for the Exploit Intelligence Platform" \
               --url "https://codeberg.org/exploit-intel/eip-search" \
