@@ -17,16 +17,23 @@ DISTROS=(
     "kali|kalilinux/kali-rolling|kali-rolling"
 )
 
-build_distro() {
-    local name="$1" base_image="$2" distro_tag="$3"
-    local image_tag="eip-search-deb-${name}"
+PLATFORMS=("linux/amd64" "linux/arm64")
+
+# Ensure buildx multi-platform support is available
+docker buildx inspect --bootstrap >/dev/null 2>&1 || true
+
+build_and_test() {
+    local name="$1" base_image="$2" distro_tag="$3" platform="$4"
+    local arch="${platform#linux/}"
+    local image_tag="eip-search-deb-${name}-${arch}"
+    local deb_file="eip-search_${VERSION}_${distro_tag}_${arch}.deb"
 
     echo ""
-    echo "==> Building eip-search ${VERSION} .deb for ${name} (${base_image})"
+    echo "==> Building eip-search ${VERSION} for ${name} (${base_image}, ${arch})"
     echo ""
 
     docker build \
-        --platform linux/amd64 \
+        --platform "${platform}" \
         --build-arg BASE_IMAGE="${base_image}" \
         --build-arg DISTRO_TAG="${distro_tag}" \
         --build-arg VERSION="${VERSION}" \
@@ -34,32 +41,49 @@ build_distro() {
         -t "${image_tag}" \
         .
 
-    # Extract the .deb from the container
+    # Extract the .deb
     local container
-    container=$(docker create "${image_tag}")
+    container=$(docker create --platform "${platform}" "${image_tag}")
     mkdir -p dist
     docker cp "${container}:/out/." dist/
     docker rm "${container}" > /dev/null
 
+    # Rename to include arch
+    if [ -f "dist/eip-search_${VERSION}_${distro_tag}_all.deb" ]; then
+        mv "dist/eip-search_${VERSION}_${distro_tag}_all.deb" "dist/${deb_file}"
+    fi
+
     echo ""
-    echo "==> Built: dist/eip-search_${VERSION}_${distro_tag}_all.deb"
+    echo "--- Testing ${deb_file} in clean container"
     echo ""
-    ls -lh "dist/eip-search_${VERSION}_${distro_tag}_all.deb"
+
+    # Smoke test: install the deb in a clean container and run --version
+    docker run --rm --platform "${platform}" \
+        -v "$(pwd)/dist:/pkg:ro" \
+        "${base_image}" \
+        bash -c "apt-get update -qq >/dev/null 2>&1 && apt-get install -y -qq /pkg/${deb_file} >/dev/null 2>&1 && eip-search --version" \
+    && echo "  PASS: ${deb_file}" \
+    || { echo "  FAIL: ${deb_file}"; exit 1; }
+
+    echo ""
+    ls -lh "dist/${deb_file}"
 }
 
 built=0
 for entry in "${DISTROS[@]}"; do
     IFS='|' read -r name base_image distro_tag <<< "${entry}"
     if [[ -z "${FILTER}" || "${name}" == "${FILTER}" ]]; then
-        build_distro "${name}" "${base_image}" "${distro_tag}"
-        built=$((built + 1))
+        for platform in "${PLATFORMS[@]}"; do
+            build_and_test "${name}" "${base_image}" "${distro_tag}" "${platform}"
+            built=$((built + 1))
+        done
     fi
 done
 
 if [[ ${built} -eq 0 ]]; then
-    echo "ERROR: Unknown distro '${FILTER}'. Available: ubuntu-jammy, ubuntu-noble, ubuntu-plucky, debian-bookworm, debian-trixie, kali" >&2
+    echo "ERROR: Unknown distro '${FILTER}'. Available: ubuntu-jammy, ubuntu-noble, ubuntu-plucky, ubuntu-questing, debian-bookworm, debian-trixie, kali" >&2
     exit 1
 fi
 
 echo ""
-echo "==> Done: ${built} package(s) built"
+echo "==> Done: ${built} package(s) built and tested"
