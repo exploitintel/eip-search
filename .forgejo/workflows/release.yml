@@ -34,28 +34,13 @@ jobs:
           sudo apt-get update && sudo apt-get install -y --no-install-recommends ruby ruby-dev gcc make
           sudo gem install --no-document fpm
 
-          # Create venv with system python, not CI python
-          sudo /usr/bin/python3 -m venv /opt/eip-search
-          /opt/eip-search/bin/pip install --no-cache-dir dist/*.whl
-
-          # Fix shebangs to use /usr/bin/python3 (portable across targets)
-          find /opt/eip-search/bin -type f -exec grep -l '#!/opt/hostedtoolcache' {} \; 2>/dev/null | \
-            xargs -r sed -i '1s|#!/opt/hostedtoolcache[^ ]*/python3|#!/opt/eip-search/bin/python3|'
-
-          # Fix venv symlinks to point to /usr/bin/python3
-          rm -f /opt/eip-search/bin/python3 /opt/eip-search/bin/python
-          ln -s /usr/bin/python3 /opt/eip-search/bin/python3
-          ln -s python3 /opt/eip-search/bin/python
-
-          # Strip unnecessary files
-          find /opt/eip-search -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
-          rm -rf /opt/eip-search/lib/python*/site-packages/pip* \
-                 /opt/eip-search/lib/python*/site-packages/setuptools* \
-                 /opt/eip-search/lib/python*/site-packages/pkg_resources*
-
-          # Create CLI symlink
-          sudo mkdir -p /usr/local/bin
-          sudo ln -sf /opt/eip-search/bin/eip-search /usr/local/bin/eip-search
+          # Create minimal package root — the postinst script creates the
+          # venv on the target using its own Python, so we only ship the
+          # version marker.  This avoids Python version and architecture
+          # mismatches between CI and the target machine.
+          PKG_ROOT=$(mktemp -d)
+          mkdir -p "${PKG_ROOT}/opt/eip-search"
+          echo "${VERSION}" > "${PKG_ROOT}/opt/eip-search/.package-version"
 
           # Build .deb for each distro (version suffix ensures unique pool files)
           for DISTRO_TAG in ubuntu-jammy ubuntu-noble ubuntu-plucky debian-bookworm debian-trixie kali-rolling; do
@@ -81,15 +66,17 @@ jobs:
               --vendor "Exploit Intelligence Platform" \
               --category utils \
               --depends python3 \
+              --depends python3-venv \
               --deb-no-default-config-files \
               --before-install packaging/deb/preinst.sh \
+              --after-install packaging/deb/postinst.sh \
               --after-remove packaging/deb/postrm.sh \
               -p "dist/eip-search_${VERSION}_${DISTRO_TAG}_all.deb" \
-              -C / \
-              opt/eip-search \
-              usr/local/bin/eip-search
+              -C "${PKG_ROOT}" \
+              opt/eip-search
           done
 
+          rm -rf "${PKG_ROOT}"
           ls -lh dist/*.deb
 
       - name: Upload to PyPI
