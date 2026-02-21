@@ -39,14 +39,16 @@ RUN mkdir -p /usr/local/bin \
 
 # Build .deb
 ARG VERSION
+ARG SUITE
 RUN test -n "$VERSION" || { echo "ERROR: --build-arg VERSION is required"; exit 1; }
 RUN test -n "$DISTRO_TAG" || { echo "ERROR: --build-arg DISTRO_TAG is required"; exit 1; }
+RUN test -n "$SUITE" || { echo "ERROR: --build-arg SUITE is required"; exit 1; }
 
 RUN mkdir /out && fpm \
     -s dir \
     -t deb \
     -n eip-search \
-    -v "${VERSION}" \
+    -v "${VERSION}~${SUITE}" \
     -a all \
     --description "CLI intelligence tool for the Exploit Intelligence Platform — a modern searchsploit replacement" \
     --url "https://codeberg.org/exploit-intel/eip-search" \

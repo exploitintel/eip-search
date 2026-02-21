@@ -41,13 +41,13 @@ echo ""
 echo "--- Building .deb packages"
 
 DISTROS=(
-    "ubuntu-jammy|ubuntu:22.04|ubuntu-jammy"
-    "ubuntu-noble|ubuntu:24.04|ubuntu-noble"
-    "ubuntu-plucky|ubuntu:25.04|ubuntu-plucky"
-    "ubuntu-questing|ubuntu:25.10|ubuntu-questing"
-    "debian-bookworm|debian:12|debian-bookworm"
-    "debian-trixie|debian:13|debian-trixie"
-    "kali|kalilinux/kali-rolling|kali-rolling"
+    "ubuntu-jammy|ubuntu:22.04|ubuntu-jammy|jammy"
+    "ubuntu-noble|ubuntu:24.04|ubuntu-noble|noble"
+    "ubuntu-plucky|ubuntu:25.04|ubuntu-plucky|plucky"
+    "ubuntu-questing|ubuntu:25.10|ubuntu-questing|questing"
+    "debian-bookworm|debian:12|debian-bookworm|bookworm"
+    "debian-trixie|debian:13|debian-trixie|trixie"
+    "kali|kalilinux/kali-rolling|kali-rolling|kali-rolling"
 )
 
 ARCH=$(uname -m)
@@ -58,15 +58,16 @@ case "$ARCH" in
 esac
 
 for entry in "${DISTROS[@]}"; do
-    IFS='|' read -r name base_image distro_tag <<< "${entry}"
+    IFS='|' read -r name base_image distro_tag suite <<< "${entry}"
 
     echo ""
-    echo "==> Building ${distro_tag} (${PLATFORM})"
+    echo "==> Building ${distro_tag} (${PLATFORM}, suite=${suite})"
 
     docker build \
         --platform "${PLATFORM}" \
         --build-arg BASE_IMAGE="${base_image}" \
         --build-arg DISTRO_TAG="${distro_tag}" \
+        --build-arg SUITE="${suite}" \
         --build-arg VERSION="${VERSION}" \
         -f packaging/deb/Dockerfile \
         -t "eip-search-deb-${name}" \
