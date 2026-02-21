@@ -139,6 +139,7 @@ done
 ###############################################################################
 echo ""
 echo "--- Uploading .debs to APT repo"
+ssh -o REDACTED root@REDACTED "rm -f /var/www/apt/incoming/*.deb"
 scp -o REDACTED dist/*.deb root@REDACTED:/var/www/apt/incoming/
 ssh -o REDACTED root@REDACTED "bash /root/upload-debs.sh"
 
