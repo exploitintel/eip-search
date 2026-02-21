@@ -103,25 +103,32 @@ export TWINE_USERNAME="${TWINE_USERNAME:-__token__}"
 twine upload --skip-existing dist/*.whl dist/*.tar.gz
 
 ###############################################################################
-# 4. Create Codeberg release
+# 4. Create Codeberg release (or find existing)
 ###############################################################################
 echo ""
 echo "--- Creating Codeberg release"
 TAG="v${VERSION}"
 API_URL="https://codeberg.org/api/v1/repos/exploit-intel/eip-search"
 
-RELEASE_ID=$(curl -sf -X POST \
+RELEASE_ID=$(curl -s -X POST \
     -H "Authorization: token ${CODEBERG_TOKEN}" \
     -H "Content-Type: application/json" \
     -d "{\"tag_name\": \"${TAG}\", \"name\": \"${TAG}\", \"draft\": false, \"prerelease\": false}" \
-    "${API_URL}/releases" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+    "${API_URL}/releases" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id',''))" 2>/dev/null)
 
-echo "Created release ${TAG} (id: ${RELEASE_ID})"
+if [ -z "$RELEASE_ID" ]; then
+    echo "Release ${TAG} already exists, looking up ID..."
+    RELEASE_ID=$(curl -s \
+        -H "Authorization: token ${CODEBERG_TOKEN}" \
+        "${API_URL}/releases/tags/${TAG}" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+fi
+
+echo "Release ${TAG} (id: ${RELEASE_ID})"
 
 for file in dist/*.deb dist/*.whl dist/*.tar.gz; do
     [ -f "$file" ] || continue
     echo "  Uploading $(basename "$file")..."
-    curl -sf -X POST \
+    curl -s -X POST \
         -H "Authorization: token ${CODEBERG_TOKEN}" \
         -F "attachment=@${file}" \
         "${API_URL}/releases/${RELEASE_ID}/assets" > /dev/null
