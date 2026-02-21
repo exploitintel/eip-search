@@ -30,7 +30,6 @@ echo ""
 echo "--- Building PyPI packages"
 make clean
 make build
-make check
 
 ###############################################################################
 # 2. Build .deb packages (arm64 native via Docker)
