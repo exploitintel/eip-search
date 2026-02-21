@@ -15,6 +15,9 @@ set -euo pipefail
 echo "Building on: $(uname -a)"
 export COLUMNS=160
 
+# Load credentials (PyPI token, Codeberg token)
+[ -f REDACTED ] && source REDACTED
+
 cd "$WORKSPACE"
 
 VERSION=$(grep '^__version__' eip_search/__init__.py | cut -d'"' -f2)
