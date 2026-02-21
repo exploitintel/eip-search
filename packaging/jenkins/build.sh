@@ -18,6 +18,9 @@ export COLUMNS=160
 # Load credentials (PyPI token, Codeberg token)
 [ -f REDACTED ] && source REDACTED
 
+# Use isolated build tools venv (avoids polluting system packages)
+export PATH="REDACTED:${PATH}"
+
 cd "$WORKSPACE"
 
 VERSION=$(grep '^__version__' eip_search/__init__.py | cut -d'"' -f2)
