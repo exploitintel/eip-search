@@ -147,19 +147,24 @@ echo ""
 ls -lh dist/*.deb dist/*.whl dist/*.tar.gz
 
 ###############################################################################
-# 3. Upload to PyPI (skip if version already exists)
+# 3–5. Publish (only on tag builds)
 ###############################################################################
+TAG="v${VERSION}"
+
+if ! git rev-parse "${TAG}" >/dev/null 2>&1; then
+    echo ""
+    echo "--- No tag ${TAG} found — skipping publish (PyPI, Codeberg, APT)"
+    echo "==> Build complete (artifacts in dist/). Tag with: make tag-release VERSION=${VERSION}"
+    exit 0
+fi
+
 echo ""
 echo "--- Uploading to PyPI"
 export TWINE_USERNAME="${TWINE_USERNAME:-__token__}"
 twine upload --skip-existing dist/*.whl dist/*.tar.gz
 
-###############################################################################
-# 4. Create Codeberg release (or find existing)
-###############################################################################
 echo ""
 echo "--- Creating Codeberg release"
-TAG="v${VERSION}"
 API_URL="https://codeberg.org/api/v1/repos/exploit-intel/eip-search"
 
 RELEASE_ID=$(curl -s -X POST \
@@ -172,32 +177,29 @@ if [ -z "$RELEASE_ID" ]; then
     echo "Release ${TAG} already exists, looking up ID..."
     RELEASE_ID=$(curl -s \
         -H "Authorization: token ${CODEBERG_TOKEN}" \
-        "${API_URL}/releases/tags/${TAG}" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+        "${API_URL}/releases/tags/${TAG}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null)
 fi
 
-echo "Release ${TAG} (id: ${RELEASE_ID})"
+if [ -n "$RELEASE_ID" ]; then
+    echo "Release ${TAG} (id: ${RELEASE_ID})"
+    for file in dist/*.deb dist/*.whl dist/*.tar.gz; do
+        [ -f "$file" ] || continue
+        echo "  Uploading $(basename "$file")..."
+        curl -s -X POST \
+            -H "Authorization: token ${CODEBERG_TOKEN}" \
+            -F "attachment=@${file}" \
+            "${API_URL}/releases/${RELEASE_ID}/assets" > /dev/null
+    done
+else
+    echo "WARNING: Could not create or find Codeberg release for ${TAG}"
+fi
 
-for file in dist/*.deb dist/*.whl dist/*.tar.gz; do
-    [ -f "$file" ] || continue
-    echo "  Uploading $(basename "$file")..."
-    curl -s -X POST \
-        -H "Authorization: token ${CODEBERG_TOKEN}" \
-        -F "attachment=@${file}" \
-        "${API_URL}/releases/${RELEASE_ID}/assets" > /dev/null
-done
-
-###############################################################################
-# 5. Upload .debs to APT repo
-###############################################################################
 echo ""
 echo "--- Uploading .debs to APT repo"
 ssh -o REDACTED root@REDACTED "rm -f /var/www/apt/incoming/*.deb"
 scp -o REDACTED dist/*.deb root@REDACTED:/var/www/apt/incoming/
 ssh -o REDACTED root@REDACTED "bash /root/upload-debs.sh"
 
-###############################################################################
-# Done
-###############################################################################
 echo ""
 echo "==> eip-search ${VERSION} released!"
 echo "    https://pypi.org/project/eip-search/${VERSION}/"
