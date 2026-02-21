@@ -72,9 +72,9 @@ jobs:
             ln -s /usr/bin/python3 /opt/eip-search/bin/python3
             ln -s python3 /opt/eip-search/bin/python
 
-            # Fix shebangs that reference the CI toolcache path
-            find /opt/eip-search/bin -type f -exec grep -l '#!/opt/hostedtoolcache\|#!/usr/bin/python3\.' {} \; 2>/dev/null | \
-              xargs -r sed -i '1s|^#!.*python[0-9.]*|#!/opt/eip-search/bin/python3|'
+            # Fix all versioned python shebangs to use the venv's python3 symlink
+            find /opt/eip-search/bin -type f -exec \
+              sed -i '1s|^#!.*python[0-9.]*$|#!/opt/eip-search/bin/python3|' {} +
 
             # Strip unnecessary files
             find /opt/eip-search -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
