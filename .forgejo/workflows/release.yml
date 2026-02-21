@@ -28,9 +28,86 @@ jobs:
 
       - name: Build .deb packages
         run: |
-          # Build each .deb inside a Docker container matching the target
-          # distro so the venv uses the correct Python version and ABI.
-          packaging/deb/build.sh
+          VERSION=$(grep '^__version__' eip_search/__init__.py | cut -d'"' -f2)
+
+          # Install fpm
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends \
+            ruby ruby-dev gcc make software-properties-common
+          sudo gem install --no-document fpm
+
+          # Install Python versions matching each target distro so the venv
+          # gets the correct lib/python3.XX/ directory and ABI-compatible
+          # compiled extensions.
+          sudo add-apt-repository -y ppa:deadsnakes/ppa
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            python3.10 python3.10-venv \
+            python3.11 python3.11-venv \
+            python3.12 python3.12-venv \
+            python3.13 python3.13-venv
+
+          # Build a separate venv + deb for each distro
+          for DISTRO_TAG in ubuntu-jammy ubuntu-noble ubuntu-plucky debian-bookworm debian-trixie kali-rolling; do
+            case "$DISTRO_TAG" in
+              ubuntu-jammy)     SUITE=jammy;        PYBIN=python3.10 ;;
+              ubuntu-noble)     SUITE=noble;        PYBIN=python3.12 ;;
+              ubuntu-plucky)    SUITE=plucky;       PYBIN=python3.13 ;;
+              debian-bookworm)  SUITE=bookworm;     PYBIN=python3.11 ;;
+              debian-trixie)    SUITE=trixie;       PYBIN=python3.13 ;;
+              kali-rolling)     SUITE=kali-rolling; PYBIN=python3.12 ;;
+            esac
+            DEB_VERSION="${VERSION}~${SUITE}"
+
+            echo "--- Building ${DISTRO_TAG} with ${PYBIN}"
+
+            # Clean slate
+            sudo rm -rf /opt/eip-search
+
+            # Create venv with the matching Python version
+            sudo "${PYBIN}" -m venv /opt/eip-search
+            /opt/eip-search/bin/pip install --no-cache-dir dist/*.whl
+
+            # Point venv python at /usr/bin/python3 (the target's system python)
+            rm -f /opt/eip-search/bin/python3 /opt/eip-search/bin/python
+            ln -s /usr/bin/python3 /opt/eip-search/bin/python3
+            ln -s python3 /opt/eip-search/bin/python
+
+            # Fix shebangs that reference the CI toolcache path
+            find /opt/eip-search/bin -type f -exec grep -l '#!/opt/hostedtoolcache\|#!/usr/bin/python3\.' {} \; 2>/dev/null | \
+              xargs -r sed -i '1s|^#!.*python[0-9.]*|#!/opt/eip-search/bin/python3|'
+
+            # Strip unnecessary files
+            find /opt/eip-search -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+            rm -rf /opt/eip-search/lib/python*/site-packages/pip* \
+                   /opt/eip-search/lib/python*/site-packages/setuptools* \
+                   /opt/eip-search/lib/python*/site-packages/pkg_resources*
+
+            # Create CLI symlink
+            sudo mkdir -p /usr/local/bin
+            sudo ln -sf /opt/eip-search/bin/eip-search /usr/local/bin/eip-search
+
+            fpm \
+              -s dir \
+              -t deb \
+              -n eip-search \
+              -v "${DEB_VERSION}" \
+              -a all \
+              --description "CLI intelligence tool for the Exploit Intelligence Platform" \
+              --url "https://codeberg.org/exploit-intel/eip-search" \
+              --license "MIT" \
+              --maintainer "Exploit Intelligence Platform" \
+              --vendor "Exploit Intelligence Platform" \
+              --category utils \
+              --depends python3 \
+              --deb-no-default-config-files \
+              --before-install packaging/deb/preinst.sh \
+              --after-remove packaging/deb/postrm.sh \
+              -p "dist/eip-search_${VERSION}_${DISTRO_TAG}_all.deb" \
+              -C / \
+              opt/eip-search \
+              usr/local/bin/eip-search
+          done
+
           ls -lh dist/*.deb
 
       - name: Upload to PyPI
