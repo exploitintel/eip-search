@@ -44,12 +44,12 @@ RUN test -n "$VERSION" || { echo "ERROR: --build-arg VERSION is required"; exit 
 RUN test -n "$DISTRO_TAG" || { echo "ERROR: --build-arg DISTRO_TAG is required"; exit 1; }
 RUN test -n "$SUITE" || { echo "ERROR: --build-arg SUITE is required"; exit 1; }
 
-RUN mkdir /out && fpm \
+RUN DEB_ARCH=$(dpkg --print-architecture) && mkdir /out && fpm \
     -s dir \
     -t deb \
     -n eip-search \
     -v "${VERSION}~${SUITE}" \
-    -a all \
+    -a "${DEB_ARCH}" \
     --description "CLI intelligence tool for the Exploit Intelligence Platform — a modern searchsploit replacement" \
     --url "https://codeberg.org/exploit-intel/eip-search" \
     --license "MIT" \
@@ -60,7 +60,7 @@ RUN mkdir /out && fpm \
     --deb-no-default-config-files \
     --before-install /scripts/preinst.sh \
     --after-remove /scripts/postrm.sh \
-    -p "/out/eip-search_${VERSION}_${DISTRO_TAG}_all.deb" \
+    -p "/out/eip-search_${VERSION}_${DISTRO_TAG}_${DEB_ARCH}.deb" \
     -C / \
     opt/eip-search \
     usr/local/bin/eip-search
