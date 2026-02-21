@@ -47,11 +47,12 @@ jobs:
             python3.13 python3.13-venv
 
           # Build a separate venv + deb for each distro
-          for DISTRO_TAG in ubuntu-jammy ubuntu-noble ubuntu-plucky debian-bookworm debian-trixie kali-rolling; do
+          for DISTRO_TAG in ubuntu-jammy ubuntu-noble ubuntu-plucky ubuntu-questing debian-bookworm debian-trixie kali-rolling; do
             case "$DISTRO_TAG" in
               ubuntu-jammy)     SUITE=jammy;        PYBIN=python3.10 ;;
               ubuntu-noble)     SUITE=noble;        PYBIN=python3.12 ;;
               ubuntu-plucky)    SUITE=plucky;       PYBIN=python3.13 ;;
+              ubuntu-questing)  SUITE=questing;     PYBIN=python3.13 ;;
               debian-bookworm)  SUITE=bookworm;     PYBIN=python3.11 ;;
               debian-trixie)    SUITE=trixie;       PYBIN=python3.13 ;;
               kali-rolling)     SUITE=kali-rolling; PYBIN=python3.12 ;;

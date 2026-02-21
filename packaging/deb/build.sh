@@ -11,6 +11,7 @@ DISTROS=(
     "ubuntu-jammy|ubuntu:22.04|ubuntu-jammy"
     "ubuntu-noble|ubuntu:24.04|ubuntu-noble"
     "ubuntu-plucky|ubuntu:25.04|ubuntu-plucky"
+    "ubuntu-questing|ubuntu:25.10|ubuntu-questing"
     "debian-bookworm|debian:12|debian-bookworm"
     "debian-trixie|debian:13|debian-trixie"
     "kali|kalilinux/kali-rolling|kali-rolling"
