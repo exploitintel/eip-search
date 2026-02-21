@@ -28,55 +28,9 @@ jobs:
 
       - name: Build .deb packages
         run: |
-          VERSION=$(grep '^__version__' eip_search/__init__.py | cut -d'"' -f2)
-
-          # Install fpm
-          sudo apt-get update && sudo apt-get install -y --no-install-recommends ruby ruby-dev gcc make
-          sudo gem install --no-document fpm
-
-          # Create minimal package root — the postinst script creates the
-          # venv on the target using its own Python, so we only ship the
-          # version marker.  This avoids Python version and architecture
-          # mismatches between CI and the target machine.
-          PKG_ROOT=$(mktemp -d)
-          mkdir -p "${PKG_ROOT}/opt/eip-search"
-          echo "${VERSION}" > "${PKG_ROOT}/opt/eip-search/.package-version"
-
-          # Build .deb for each distro (version suffix ensures unique pool files)
-          for DISTRO_TAG in ubuntu-jammy ubuntu-noble ubuntu-plucky debian-bookworm debian-trixie kali-rolling; do
-            case "$DISTRO_TAG" in
-              ubuntu-jammy)     SUITE=jammy ;;
-              ubuntu-noble)     SUITE=noble ;;
-              ubuntu-plucky)    SUITE=plucky ;;
-              debian-bookworm)  SUITE=bookworm ;;
-              debian-trixie)    SUITE=trixie ;;
-              kali-rolling)     SUITE=kali-rolling ;;
-            esac
-            DEB_VERSION="${VERSION}~${SUITE}"
-            fpm \
-              -s dir \
-              -t deb \
-              -n eip-search \
-              -v "${DEB_VERSION}" \
-              -a all \
-              --description "CLI intelligence tool for the Exploit Intelligence Platform" \
-              --url "https://codeberg.org/exploit-intel/eip-search" \
-              --license "MIT" \
-              --maintainer "Exploit Intelligence Platform" \
-              --vendor "Exploit Intelligence Platform" \
-              --category utils \
-              --depends python3 \
-              --depends python3-venv \
-              --deb-no-default-config-files \
-              --before-install packaging/deb/preinst.sh \
-              --after-install packaging/deb/postinst.sh \
-              --after-remove packaging/deb/postrm.sh \
-              -p "dist/eip-search_${VERSION}_${DISTRO_TAG}_all.deb" \
-              -C "${PKG_ROOT}" \
-              opt/eip-search
-          done
-
-          rm -rf "${PKG_ROOT}"
+          # Build each .deb inside a Docker container matching the target
+          # distro so the venv uses the correct Python version and ABI.
+          packaging/deb/build.sh
           ls -lh dist/*.deb
 
       - name: Upload to PyPI
