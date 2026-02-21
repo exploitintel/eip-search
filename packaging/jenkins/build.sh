@@ -95,12 +95,12 @@ echo ""
 ls -lh dist/*.deb dist/*.whl dist/*.tar.gz
 
 ###############################################################################
-# 3. Upload to PyPI
+# 3. Upload to PyPI (skip if version already exists)
 ###############################################################################
 echo ""
 echo "--- Uploading to PyPI"
 export TWINE_USERNAME="${TWINE_USERNAME:-__token__}"
-twine upload dist/*.whl dist/*.tar.gz
+twine upload --skip-existing dist/*.whl dist/*.tar.gz
 
 ###############################################################################
 # 4. Create Codeberg release
