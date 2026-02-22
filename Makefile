@@ -111,8 +111,8 @@ pypi:
 upload-repo:
 	@echo "--- Uploading .debs to APT repo"
 	@ls dist/*.deb >/dev/null 2>&1 || { echo "No .deb files in dist/. Run 'make deb' first."; exit 1; }
-	scp dist/*.deb root@REDACTED:/var/www/apt/incoming/
-	ssh root@REDACTED "bash /root/upload-debs.sh"
+	scp dist/*.deb root@$${REPO_HOST:?Set REPO_HOST}:/var/www/apt/incoming/
+	ssh root@$${REPO_HOST:?Set REPO_HOST} "bash /root/upload-debs.sh"
 
 # ── Build .deb package(s) (requires Docker) ──────────────────────────────────
 #   make deb              — build all 4 distros
