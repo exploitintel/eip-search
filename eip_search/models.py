@@ -158,8 +158,11 @@ class VulnSummary:
     cvss_v3_score: float | None
     epss_score: float | None
     is_kev: bool
-    has_nuclei_template: bool
-    exploit_count: int
+    is_vulncheck_kev: bool = False
+    is_exploited_wild: bool = False
+    ransomware_use: str | None = None
+    has_nuclei_template: bool = False
+    exploit_count: int = 0
     cwe_ids: list[str] = field(default_factory=list)
     cve_published_at: str | None = None
 
@@ -173,6 +176,9 @@ class VulnSummary:
             cvss_v3_score=data.get("cvss_v3_score"),
             epss_score=data.get("epss_score"),
             is_kev=data.get("is_kev", False),
+            is_vulncheck_kev=data.get("is_vulncheck_kev", False),
+            is_exploited_wild=data.get("is_exploited_wild", False),
+            ransomware_use=data.get("ransomware_use"),
             has_nuclei_template=data.get("has_nuclei_template", False),
             exploit_count=data.get("exploit_count", 0),
             cwe_ids=data.get("cwe_ids") or [],
@@ -204,6 +210,13 @@ class VulnDetail:
     cwe_ids: list[str] = field(default_factory=list)
     is_kev: bool = False
     kev_added_at: str | None = None
+    is_vulncheck_kev: bool = False
+    vulncheck_kev_added_at: str | None = None
+    ransomware_use: str | None = None
+    is_exploited_wild: bool = False
+    wild_reported_at: str | None = None
+    is_euvd_exploited: bool = False
+    euvd_id: str | None = None
     has_nuclei_template: bool = False
     cve_published_at: str | None = None
     created_at: str | None = None
@@ -232,6 +245,13 @@ class VulnDetail:
             cwe_ids=data.get("cwe_ids") or [],
             is_kev=data.get("is_kev", False),
             kev_added_at=data.get("kev_added_at"),
+            is_vulncheck_kev=data.get("is_vulncheck_kev", False),
+            vulncheck_kev_added_at=data.get("vulncheck_kev_added_at"),
+            ransomware_use=data.get("ransomware_use"),
+            is_exploited_wild=data.get("is_exploited_wild", False),
+            wild_reported_at=data.get("wild_reported_at"),
+            is_euvd_exploited=data.get("is_euvd_exploited", False),
+            euvd_id=data.get("euvd_id"),
             has_nuclei_template=data.get("has_nuclei_template", False),
             cve_published_at=data.get("cve_published_at"),
             created_at=data.get("created_at"),
@@ -354,6 +374,10 @@ class Stats:
     with_cvss: int = 0
     with_epss: int = 0
     kev_total: int = 0
+    vulncheck_kev_total: int = 0
+    wild_total: int = 0
+    ransomware_total: int = 0
+    any_exploited_total: int = 0
     critical_count: int = 0
     with_nuclei: int = 0
     total_with_exploits: int = 0
@@ -371,6 +395,10 @@ class Stats:
             with_cvss=data.get("with_cvss", 0),
             with_epss=data.get("with_epss", 0),
             kev_total=data.get("kev_total", 0),
+            vulncheck_kev_total=data.get("vulncheck_kev_total", 0),
+            wild_total=data.get("wild_total", 0),
+            ransomware_total=data.get("ransomware_total", 0),
+            any_exploited_total=data.get("any_exploited_total", 0),
             critical_count=data.get("critical_count", 0),
             with_nuclei=data.get("with_nuclei", 0),
             total_with_exploits=data.get("total_with_exploits", 0),

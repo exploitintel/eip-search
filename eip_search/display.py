@@ -71,10 +71,24 @@ def _format_epss(score: float | None) -> Text:
     return Text(f"{pct:.1f}%", style=style)
 
 
-def _format_kev(is_kev: bool) -> Text:
-    if is_kev:
-        return Text("KEV", style="bold red")
-    return Text("", style="dim")
+def _format_kev(v) -> Text:
+    """Format exploitation tags for a vulnerability summary."""
+    parts = []
+    if getattr(v, "is_kev", False):
+        parts.append(("KEV", "bold red"))
+    elif getattr(v, "is_vulncheck_kev", False) or getattr(v, "is_exploited_wild", False):
+        parts.append(("EXP", "bold yellow"))
+    if getattr(v, "ransomware_use", None) == "Known":
+        parts.append(("RW", "bold red"))
+
+    if not parts:
+        return Text("", style="dim")
+    t = Text()
+    for i, (label, style) in enumerate(parts):
+        if i > 0:
+            t.append(" ")
+        t.append(label, style=style)
+    return t
 
 
 def _format_exploits(count: int) -> Text:
@@ -105,7 +119,7 @@ def print_search_results(result: SearchResult) -> None:
     table.add_column("CVSS", justify="right", no_wrap=True, width=5)
     table.add_column("EPSS", justify="right", no_wrap=True, width=6)
     table.add_column("Exp", justify="right", no_wrap=True, width=4)
-    table.add_column("", no_wrap=True, width=3)  # KEV flag
+    table.add_column("", no_wrap=True, width=6)  # KEV/EXP/RW flags
     table.add_column("Title", ratio=1)
 
     for v in result.items:
@@ -115,7 +129,7 @@ def print_search_results(result: SearchResult) -> None:
             _format_cvss(v.cvss_v3_score),
             _format_epss(v.epss_score),
             _format_exploits(v.exploit_count),
-            _format_kev(v.is_kev),
+            _format_kev(v),
             Text(v.title or "", overflow="ellipsis", no_wrap=True),
         )
 
@@ -257,6 +271,12 @@ def print_vuln_detail(vuln: VulnDetail, *, show_all: bool = False) -> None:
     if vuln.is_kev:
         header.append("  ")
         header.append("KEV", style="bold red")
+    if vuln.is_vulncheck_kev and not vuln.is_kev:
+        header.append("  ")
+        header.append("EXPLOITED", style="bold yellow")
+    if vuln.ransomware_use == "Known":
+        header.append("  ")
+        header.append("RANSOMWARE", style="bold red")
     if vuln.has_nuclei_template:
         header.append("  ")
         header.append("NUCLEI", style="bold magenta")
@@ -293,7 +313,15 @@ def print_vuln_detail(vuln: VulnDetail, *, show_all: bool = False) -> None:
     if vuln.cve_published_at:
         meta_parts.append(f"Published: {vuln.cve_published_at[:10]}")
     if vuln.is_kev and vuln.kev_added_at:
-        meta_parts.append(f"KEV added: {vuln.kev_added_at[:10]}")
+        meta_parts.append(f"CISA KEV: {vuln.kev_added_at[:10]}")
+    if vuln.is_vulncheck_kev and vuln.vulncheck_kev_added_at:
+        meta_parts.append(f"VulnCheck KEV: {vuln.vulncheck_kev_added_at[:10]}")
+    if vuln.is_exploited_wild and vuln.wild_reported_at:
+        meta_parts.append(f"InTheWild: {vuln.wild_reported_at[:10]}")
+    if vuln.is_euvd_exploited and vuln.euvd_id:
+        meta_parts.append(f"EUVD: {vuln.euvd_id}")
+    if vuln.ransomware_use == "Known":
+        meta_parts.append("Ransomware: CONFIRMED")
     if meta_parts:
         console.print(f"  [dim]{' | '.join(meta_parts)}[/dim]")
 
@@ -616,6 +644,8 @@ def print_stats(stats: Stats) -> None:
     table.add_row("With EPSS Scores", f"{stats.with_epss:,}")
     table.add_row("Critical Severity", f"[red]{stats.critical_count:,}[/red]")
     table.add_row("CISA KEV Entries", f"[red]{stats.kev_total:,}[/red]")
+    table.add_row("Exploited in Wild", f"[red]{stats.any_exploited_total:,}[/red]")
+    table.add_row("Ransomware-linked", f"[red]{stats.ransomware_total:,}[/red]")
     table.add_row("", "")
     table.add_row("Vulns with Exploits", f"[green]{stats.total_with_exploits:,}[/green]")
     table.add_row("Total Exploits", f"[green]{stats.total_exploits:,}[/green]")

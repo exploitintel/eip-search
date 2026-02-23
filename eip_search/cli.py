@@ -96,6 +96,8 @@ def search(
     severity: Optional[str] = typer.Option(None, "--severity", "-s", help="Filter: critical, high, medium, low"),
     has_exploits: bool = typer.Option(False, "--has-exploits", "-e", help="Only CVEs with public exploits"),
     kev: bool = typer.Option(False, "--kev", "-k", help="Only CISA Known Exploited Vulnerabilities"),
+    exploited: bool = typer.Option(False, "--exploited", "-x", help="Only CVEs exploited in the wild (CISA + VulnCheck + InTheWild)"),
+    ransomware: bool = typer.Option(False, "--ransomware", help="Only CVEs with confirmed ransomware use"),
     has_nuclei: bool = typer.Option(False, "--has-nuclei", help="Only CVEs with Nuclei templates"),
     vendor: Optional[str] = typer.Option(None, "--vendor", "-v", help="Filter by vendor name"),
     product: Optional[str] = typer.Option(None, "--product", "-p", help="Filter by product name"),
@@ -121,8 +123,9 @@ def search(
       eip-search search --cwe 89 --has-exploits --sort cvss_desc
     """
     has_filters = any([
-        severity, has_exploits, kev, has_nuclei, vendor, product,
-        ecosystem, cwe, year, min_cvss, min_epss, date_from, date_to,
+        severity, has_exploits, kev, exploited, ransomware, has_nuclei,
+        vendor, product, ecosystem, cwe, year, min_cvss, min_epss,
+        date_from, date_to,
     ])
     if not query and not has_filters:
         from eip_search.display import print_error
@@ -136,6 +139,7 @@ def search(
 
     _do_search(
         q=query, severity=severity, has_exploits=has_exploits, kev=kev,
+        exploited=exploited, ransomware=ransomware,
         has_nuclei=has_nuclei, vendor=vendor, product=product, ecosystem=ecosystem,
         cwe=cwe, year=year, min_cvss=min_cvss, min_epss=min_epss,
         date_from=date_from, date_to=date_to, sort=sort, page=page,
@@ -170,7 +174,8 @@ def main() -> None:
     pass
 
 
-def _do_search(*, q, severity, has_exploits, kev, has_nuclei, vendor, product,
+def _do_search(*, q, severity, has_exploits, kev, exploited=False,
+               ransomware=False, has_nuclei, vendor, product,
                ecosystem, cwe, year, min_cvss, min_epss, date_from, date_to,
                sort, page, per_page, output_json):
     """Execute a search and display results."""
@@ -181,6 +186,8 @@ def _do_search(*, q, severity, has_exploits, kev, has_nuclei, vendor, product,
         "q": q,
         "severity": severity,
         "is_kev": kev or None,
+        "any_exploited": exploited or None,
+        "ransomware": ransomware or None,
         "has_exploits": has_exploits or None,
         "has_nuclei": has_nuclei or None,
         "vendor": vendor,
@@ -988,6 +995,10 @@ def stats(
             "with_cvss": data.with_cvss,
             "with_epss": data.with_epss,
             "kev_total": data.kev_total,
+            "vulncheck_kev_total": data.vulncheck_kev_total,
+            "wild_total": data.wild_total,
+            "ransomware_total": data.ransomware_total,
+            "any_exploited_total": data.any_exploited_total,
             "critical_count": data.critical_count,
             "with_nuclei": data.with_nuclei,
             "total_with_exploits": data.total_with_exploits,
@@ -1210,6 +1221,9 @@ def _vuln_summary_dict(v) -> dict:
         "cvss_v3_score": v.cvss_v3_score,
         "epss_score": v.epss_score,
         "is_kev": v.is_kev,
+        "is_vulncheck_kev": v.is_vulncheck_kev,
+        "is_exploited_wild": v.is_exploited_wild,
+        "ransomware_use": v.ransomware_use,
         "has_nuclei_template": v.has_nuclei_template,
         "exploit_count": v.exploit_count,
         "cwe_ids": v.cwe_ids,
@@ -1252,6 +1266,13 @@ def _vuln_detail_dict(v) -> dict:
         "cwe_ids": v.cwe_ids,
         "is_kev": v.is_kev,
         "kev_added_at": v.kev_added_at,
+        "is_vulncheck_kev": v.is_vulncheck_kev,
+        "vulncheck_kev_added_at": v.vulncheck_kev_added_at,
+        "ransomware_use": v.ransomware_use,
+        "is_exploited_wild": v.is_exploited_wild,
+        "wild_reported_at": v.wild_reported_at,
+        "is_euvd_exploited": v.is_euvd_exploited,
+        "euvd_id": v.euvd_id,
         "has_nuclei_template": v.has_nuclei_template,
         "cve_published_at": v.cve_published_at,
         "exploit_count": len(v.exploits),
