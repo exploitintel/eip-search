@@ -21,7 +21,7 @@ MAX_PER_PAGE = 100
 DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434"
 DEFAULT_VISION_MODEL = "qwen3-vl:235b-instruct-cloud"
 DEFAULT_CODE_MODEL = "kimi-k2:1t-cloud"
-DEFAULT_DB_URL = "https://data.exploit-intel.com/eip.db.gz"
+DEFAULT_DB_URL = "https://repo.exploit-intel.com/data/eip.db.gz"
 
 
 @dataclass

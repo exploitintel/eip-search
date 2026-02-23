@@ -30,7 +30,7 @@ from eip_search.models import (
 )
 
 DEFAULT_DB_PATH = Path.home() / ".eip" / "eip.db"
-DEFAULT_DB_URL = "https://data.exploit-intel.com/eip.db.gz"
+DEFAULT_DB_URL = "https://repo.exploit-intel.com/data/eip.db.gz"
 
 
 class LocalClient:
