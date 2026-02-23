@@ -31,7 +31,7 @@ Part of the same project family:
 
 **searchsploit** is grep over a CSV. It can tell you an exploit exists, but nothing about how dangerous the vulnerability is, how reliable the exploit is, or whether it's secretly a trojan.
 
-**eip-search** combines data from NVD, CISA KEV, EPSS, ExploitDB, Metasploit, GitHub, and nomi-sec into a single tool that answers questions searchsploit never could:
+**eip-search** combines data from NVD, CISA KEV, VulnCheck KEV, InTheWild.io, ENISA EUVD, EPSS, ExploitDB, Metasploit, GitHub, and nomi-sec into a single tool that answers questions searchsploit never could:
 
 - "What critical Fortinet vulns are being actively exploited right now?"
 - "Which of these 127 BlueKeep exploits is actually reliable — and which one is a trojan?"
@@ -246,7 +246,7 @@ $ eip-search "palo alto"
 Page 1/9 (41 total results)
 ```
 
-Every result includes CVSS score, EPSS exploitation probability, exploit count, and CISA KEV status — context searchsploit simply doesn't have.
+Every result includes CVSS score, EPSS exploitation probability, exploit count, CISA KEV status, VulnCheck KEV, InTheWild.io signals, and ransomware attribution — context searchsploit simply doesn't have.
 
 ## CVE Intelligence Briefs
 
@@ -750,6 +750,8 @@ The `view` and `download` commands accept either an exploit ID (e.g. `77423`) or
 | `--severity` | `-s` | critical, high, medium, low |
 | `--has-exploits` | `-e` | Only CVEs with public exploit code |
 | `--kev` | `-k` | Only CISA Known Exploited Vulnerabilities |
+| `--exploited` | `-x` | Only CVEs exploited in the wild (CISA + VulnCheck + InTheWild) |
+| `--ransomware` | | Only CVEs with confirmed ransomware campaign use |
 | `--has-nuclei` | | Only CVEs with Nuclei scanner templates |
 | `--vendor` | `-v` | Filter by vendor name |
 | `--product` | `-p` | Filter by product name |
