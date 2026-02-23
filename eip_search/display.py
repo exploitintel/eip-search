@@ -867,6 +867,175 @@ def print_products_list(data: dict) -> None:
 # Lookup
 # ---------------------------------------------------------------------------
 
+def print_exploit_analysis(exploit: ExploitWithCVE) -> None:
+    """Print a full LLM analysis panel for a single exploit."""
+    console.print()
+
+    # ── Header ────────────────────────────────────────────────────────
+    header = Text()
+    header.append(f"#{exploit.id}", style="bold cyan")
+    header.append("  ")
+    header.append(exploit.source, style="bold magenta" if exploit.source == "metasploit" else "bold green" if exploit.source == "exploitdb" else "cyan")
+    if exploit.cve_id:
+        header.append("  ")
+        header.append(exploit.cve_id, style="bold")
+    if exploit.severity_label:
+        sev_style = _SEVERITY_COLORS.get(exploit.severity_label, "dim")
+        header.append("  ")
+        header.append(exploit.severity_label.upper(), style=sev_style)
+    console.print(Panel(header, border_style="bold cyan", expand=False))
+
+    # Name / URL
+    name = exploit.source_id or exploit.display_name
+    console.print(f"  [bold]{escape(name)}[/bold]")
+    if exploit.source_url:
+        console.print(f"  [dim]{escape(exploit.source_url)}[/dim]")
+    if exploit.cve_title:
+        console.print(f"  [dim]{escape(exploit.cve_title)}[/dim]")
+
+    # ── Classification badge ──────────────────────────────────────────
+    cls = exploit.llm_classification
+    if cls:
+        cls_styles = {
+            "working_poc": "bold green",
+            "scanner": "bold blue",
+            "tool": "bold blue",
+            "stub": "dim",
+            "writeup": "dim",
+            "trojan": "bold red",
+            "suspicious": "bold yellow",
+        }
+        style = cls_styles.get(cls, "white")
+        console.print()
+        label = cls.upper().replace("_", " ")
+        console.print(f"  Classification:  [{style}]{label}[/{style}]")
+
+        if cls == "trojan":
+            console.print(f"  [bold red]WARNING: This exploit has been flagged as a TROJAN by AI analysis.[/bold red]")
+            console.print(f"  [bold red]Do NOT execute this code without thorough manual review.[/bold red]")
+        elif cls == "suspicious":
+            console.print(f"  [bold yellow]CAUTION: This exploit has been flagged as SUSPICIOUS by AI analysis.[/bold yellow]")
+
+    # ── LLM Analysis detail ───────────────────────────────────────────
+    analysis = exploit.llm_analysis
+    if not analysis:
+        console.print()
+        console.print("  [dim]No LLM analysis available for this exploit.[/dim]")
+        console.print()
+        return
+
+    console.print()
+    table = Table(show_header=False, box=None, padding=(0, 2), expand=False)
+    table.add_column("Field", style="dim", min_width=16)
+    table.add_column("Value")
+
+    if analysis.get("attack_type"):
+        at = analysis["attack_type"]
+        at_style = "bold red" if at == "RCE" else "bold yellow" if at in ("SQLi", "auth_bypass", "LPE") else "white"
+        table.add_row("Attack Type", f"[{at_style}]{at}[/{at_style}]")
+
+    if analysis.get("complexity"):
+        cx = analysis["complexity"]
+        cx_style = "bold red" if cx == "trivial" else "yellow" if cx == "simple" else "white"
+        table.add_row("Complexity", cx)
+
+    if analysis.get("reliability"):
+        rel = analysis["reliability"]
+        rel_style = "bold green" if rel == "reliable" else "yellow" if rel == "unreliable" else "dim"
+        table.add_row("Reliability", f"[{rel_style}]{rel}[/{rel_style}]")
+
+    if analysis.get("confidence") is not None:
+        conf = analysis["confidence"]
+        table.add_row("Confidence", f"{conf:.0%}")
+
+    if "requires_auth" in analysis and analysis["requires_auth"] is not None:
+        auth = analysis["requires_auth"]
+        table.add_row("Requires Auth", "[green]No[/green]" if not auth else "[yellow]Yes[/yellow]")
+
+    if analysis.get("target_software"):
+        table.add_row("Target", escape(str(analysis["target_software"])))
+
+    console.print(Padding(table, (0, 2)))
+
+    # Summary
+    if analysis.get("summary"):
+        console.print()
+        console.print(f"  [bold]Summary[/bold]")
+        # Wrap long summaries
+        summary = analysis["summary"]
+        for line in _wrap_text(summary, width=78):
+            console.print(f"    {escape(line)}")
+
+    # Prerequisites
+    prereqs = analysis.get("prerequisites")
+    if prereqs and isinstance(prereqs, list):
+        console.print()
+        console.print(f"  [bold]Prerequisites[/bold]")
+        for p in prereqs:
+            console.print(f"    [dim]\u2022[/dim] {escape(str(p))}")
+
+    # MITRE ATT&CK
+    mitre = analysis.get("mitre_techniques")
+    if mitre and isinstance(mitre, list):
+        console.print()
+        console.print(f"  [bold]MITRE ATT&CK[/bold]")
+        for t in mitre:
+            console.print(f"    [dim]\u2022[/dim] {escape(str(t))}")
+
+    # Deception indicators (for trojans/suspicious)
+    indicators = analysis.get("deception_indicators")
+    if indicators and isinstance(indicators, list) and len(indicators) > 0:
+        console.print()
+        console.print(f"  [bold red]Deception Indicators[/bold red]")
+        for d in indicators:
+            console.print(f"    [red]\u2022[/red] {escape(str(d))}")
+
+    # Malicious flag
+    if analysis.get("is_malicious"):
+        console.print()
+        console.print(f"  [bold red]MALICIOUS: This exploit contains malicious code.[/bold red]")
+
+    console.print()
+
+    # Metadata footer
+    meta: list[str] = []
+    if exploit.author_name:
+        meta.append(f"Author: {exploit.author_name}")
+    if exploit.language:
+        meta.append(f"Language: {exploit.language}")
+    if exploit.exploit_rank:
+        meta.append(f"Rank: {exploit.exploit_rank}")
+    if exploit.github_stars:
+        meta.append(f"\u2605 {exploit.github_stars}")
+    if exploit.verified:
+        meta.append("\u2713 verified")
+    if exploit.has_code:
+        meta.append("has code")
+    if meta:
+        console.print(f"  [dim]{'  \u2502  '.join(meta)}[/dim]")
+        console.print()
+
+
+def _wrap_text(text: str, width: int = 78) -> list[str]:
+    """Simple word-wrap for plain text."""
+    lines: list[str] = []
+    for paragraph in text.split("\n"):
+        if not paragraph.strip():
+            lines.append("")
+            continue
+        words = paragraph.split()
+        current = ""
+        for word in words:
+            if current and len(current) + 1 + len(word) > width:
+                lines.append(current)
+                current = word
+            else:
+                current = f"{current} {word}" if current else word
+        if current:
+            lines.append(current)
+    return lines
+
+
 def print_lookup_result(data: dict) -> None:
     """Print alt-ID lookup result."""
     alt_id = data.get("alt_id", "?")

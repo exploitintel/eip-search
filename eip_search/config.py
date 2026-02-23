@@ -21,6 +21,7 @@ MAX_PER_PAGE = 100
 DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434"
 DEFAULT_VISION_MODEL = "qwen3-vl:235b-instruct-cloud"
 DEFAULT_CODE_MODEL = "kimi-k2:1t-cloud"
+DEFAULT_DB_URL = "https://data.exploit-intel.com/eip.db.gz"
 
 
 @dataclass
@@ -33,6 +34,8 @@ class Config:
     ollama_url: str = DEFAULT_OLLAMA_URL
     vision_model: str = DEFAULT_VISION_MODEL
     code_model: str = DEFAULT_CODE_MODEL
+    db_path: str | None = None
+    db_url: str | None = None
 
     @classmethod
     def load(cls) -> Config:
@@ -49,6 +52,7 @@ class Config:
         api_section = data.get("api", {})
         display_section = data.get("display", {})
         gen_section = data.get("generate", {})
+        offline_section = data.get("offline", {})
 
         return cls(
             base_url=api_section.get("base_url", DEFAULT_BASE_URL).rstrip("/"),
@@ -57,6 +61,8 @@ class Config:
             ollama_url=gen_section.get("ollama_url", DEFAULT_OLLAMA_URL).rstrip("/"),
             vision_model=gen_section.get("vision_model", DEFAULT_VISION_MODEL),
             code_model=gen_section.get("code_model", DEFAULT_CODE_MODEL),
+            db_path=offline_section.get("db_path"),
+            db_url=offline_section.get("db_url"),
         )
 
 

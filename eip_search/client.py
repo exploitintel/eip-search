@@ -14,6 +14,7 @@ from eip_search.config import get_config
 from eip_search.models import (
     ExploitBrowseResult,
     ExploitFile,
+    ExploitWithCVE,
     SearchResult,
     Stats,
     VulnDetail,
@@ -136,6 +137,13 @@ def get_vuln_detail(vuln_id: str) -> VulnDetail:
     with httpx.Client(timeout=TIMEOUT, headers=_build_headers(), follow_redirects=True) as client:
         resp = client.get(_api_url(f"/api/v1/vulns/{vuln_id}"))
     return VulnDetail.from_dict(_handle_response(resp))
+
+
+def get_exploit_analysis(exploit_id: int) -> ExploitWithCVE:
+    """Get a single exploit with its LLM analysis and CVE context."""
+    with httpx.Client(timeout=TIMEOUT, headers=_build_headers(), follow_redirects=True) as client:
+        resp = client.get(_api_url(f"/api/v1/exploits/{exploit_id}"))
+    return ExploitWithCVE.from_dict(_handle_response(resp))
 
 
 def list_exploit_files(exploit_id: int) -> list[ExploitFile]:

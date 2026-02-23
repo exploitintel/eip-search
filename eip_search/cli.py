@@ -29,7 +29,39 @@ _app = typer.Typer(
 _SUBCOMMANDS = {
     "search", "info", "view", "download", "generate", "triage", "nuclei", "exploits",
     "stats", "authors", "author", "cwes", "cwe", "vendors", "products", "lookup",
+    "analysis", "update-db",
 }
+
+# ---------------------------------------------------------------------------
+# Offline mode state
+# ---------------------------------------------------------------------------
+_offline_mode: bool = False
+_db_override: str | None = None
+_local_client_instance = None
+
+
+def _get_client():
+    """Return the API client module or a LocalClient instance for offline mode."""
+    global _local_client_instance
+    if not _offline_mode:
+        import eip_search.client
+        return eip_search.client
+
+    if _local_client_instance is None:
+        from eip_search.local_client import LocalClient, DEFAULT_DB_PATH
+        from eip_search.config import get_config
+        cfg = get_config()
+        db_path = _db_override or cfg.db_path or str(DEFAULT_DB_PATH)
+        try:
+            _local_client_instance = LocalClient(db_path)
+        except FileNotFoundError:
+            from eip_search.display import print_error
+            print_error(
+                f"EIP database not found: {db_path}\n"
+                "Download it with: eip-search update-db"
+            )
+            raise typer.Exit(1)
+    return _local_client_instance
 
 
 def app():
@@ -41,10 +73,25 @@ def app():
         console.print(f"eip-search {__version__}")
         raise SystemExit(0)
 
-    # If the first non-option arg isn't a known subcommand, prepend "search"
-    if args and not args[0].startswith("-") and args[0] not in _SUBCOMMANDS:
-        # e.g. eip-search "apache httpd" → eip-search search "apache httpd"
-        sys.argv = [sys.argv[0], "search"] + args
+    # Find the first positional argument (skip global flags like --offline, --db VALUE)
+    _GLOBAL_FLAGS = {"--offline"}
+    _GLOBAL_VALUE_FLAGS = {"--db"}
+    idx = 0
+    while idx < len(args):
+        a = args[idx]
+        if a in _GLOBAL_FLAGS:
+            idx += 1
+        elif a in _GLOBAL_VALUE_FLAGS:
+            idx += 2  # skip flag and its value
+        elif a.startswith("--db="):
+            idx += 1
+        else:
+            break
+
+    # If the first positional arg isn't a known subcommand, prepend "search"
+    if idx < len(args) and not args[idx].startswith("-") and args[idx] not in _SUBCOMMANDS:
+        # e.g. eip-search --offline "apache httpd" → eip-search --offline search "apache httpd"
+        sys.argv = [sys.argv[0]] + args[:idx] + ["search"] + args[idx:]
 
     _app()
 
@@ -148,7 +195,10 @@ def search(
 
 
 @_app.callback()
-def main() -> None:
+def main(
+    offline: bool = typer.Option(False, "--offline", help="Use local SQLite database instead of the API"),
+    db: Optional[str] = typer.Option(None, "--db", help="Path to local SQLite database (implies --offline)"),
+) -> None:
     """Search exploits, vulnerabilities, and threat intelligence from the Exploit Intelligence Platform.
 
     \b
@@ -162,6 +212,12 @@ def main() -> None:
       eip-search search --vendor paloalto --min-epss 0.5
 
     \b
+    Offline mode (requires local database):
+      eip-search update-db                  Download offline database
+      eip-search --offline search "apache"  Search locally
+      eip-search --db /path/to/eip.db info CVE-2024-3400
+
+    \b
     Other commands:
       eip-search info CVE-2024-3400          Full intelligence brief
       eip-search exploits "fortinet" -c      Browse exploits directly
@@ -171,7 +227,12 @@ def main() -> None:
       eip-search download CVE-2024-3400 -x  Download exploit ZIP
       eip-search stats                      Platform statistics
     """
-    pass
+    global _offline_mode, _db_override
+    if db is not None:
+        _offline_mode = True
+        _db_override = db
+    elif offline:
+        _offline_mode = True
 
 
 def _do_search(*, q, severity, has_exploits, kev, exploited=False,
@@ -179,9 +240,9 @@ def _do_search(*, q, severity, has_exploits, kev, exploited=False,
                ecosystem, cwe, year, min_cvss, min_epss, date_from, date_to,
                sort, page, per_page, output_json):
     """Execute a search and display results."""
-    from eip_search import client
     from eip_search.config import get_config
 
+    client = _get_client()
     params = {
         "q": q,
         "severity": severity,
@@ -234,7 +295,7 @@ def info(
 
 
 def _do_info(vuln_id: str, *, show_all: bool = False, output_json: bool = False):
-    from eip_search import client
+    client = _get_client()
 
     vuln = _api_call(client.get_vuln_detail, vuln_id, spinner_text=f"Fetching {vuln_id}...")
 
@@ -267,10 +328,10 @@ def _resolve_exploit_id(target: str, *, code_only: bool = False) -> int:
         print_error(f"'{target}' is not a valid exploit ID or CVE ID.")
         raise typer.Exit(1)
 
-    from eip_search import client
     from eip_search.ranking import rank_exploits
     from eip_search.display import print_exploit_picker
 
+    client = _get_client()
     vuln_id = _normalize_vuln_id(target)
     vuln = _api_call(client.get_vuln_detail, vuln_id, spinner_text=f"Fetching {vuln_id}...")
 
@@ -333,6 +394,10 @@ def view(
       eip-search view CVE-2024-3400
       eip-search view 77423 --file exploit.py
     """
+    if _offline_mode:
+        from eip_search.display import print_error
+        print_error("Viewing exploit code requires the API. Remove --offline to use this command.")
+        raise typer.Exit(1)
     from eip_search import client
     from eip_search.display import print_code, print_exploit_files
 
@@ -418,6 +483,10 @@ def download(
       eip-search download 77423 --extract
       eip-search download 77423 -x -o /tmp/exploits
     """
+    if _offline_mode:
+        from eip_search.display import print_error
+        print_error("Downloading exploits requires the API. Remove --offline to use this command.")
+        raise typer.Exit(1)
     import zipfile
     from pathlib import Path
     from eip_search import client
@@ -546,7 +615,6 @@ def generate(
     from rich.markup import escape
     from rich.status import Status
 
-    from eip_search import client
     from eip_search.config import get_config
     from eip_search.display import print_code, print_error
     from eip_search.generate import (
@@ -566,6 +634,7 @@ def generate(
     vid = _normalize_vuln_id(vuln_id)
 
     # -- Fetch CVE intelligence + feasibility gate (before touching Ollama) --
+    client = _get_client()
     vuln = _api_call(client.get_vuln_detail, vid, spinner_text=f"Fetching {vid}...")
 
     feas = classify_feasibility(vuln)
@@ -792,9 +861,9 @@ def triage(
       eip-search triage --ecosystem npm --min-epss 0.3
       eip-search triage --kev
     """
-    from eip_search import client
     from eip_search.config import get_config
 
+    client = _get_client()
     params = {
         "has_exploits": True,
         "is_kev": kev or None,
@@ -879,8 +948,9 @@ def exploits(
       eip-search exploits --cve CVE-2024-3400
       eip-search exploits --author "Chocapikk" --sort stars_desc
     """
-    from eip_search import client
     from eip_search.config import get_config
+
+    client = _get_client()
 
     # Auto-detect positional query: CVE ID → --cve, otherwise → --vendor
     if query and not cve and not vendor:
@@ -950,7 +1020,7 @@ def nuclei(
     Examples:
       eip-search nuclei CVE-2024-27198
     """
-    from eip_search import client
+    client = _get_client()
 
     vid = _normalize_vuln_id(vuln_id)
     vuln = _api_call(client.get_vuln_detail, vid, spinner_text=f"Fetching {vid}...")
@@ -984,7 +1054,7 @@ def stats(
     output_json: bool = typer.Option(False, "--json", "-j", help="Output raw JSON"),
 ) -> None:
     """Show platform-wide statistics."""
-    from eip_search import client
+    client = _get_client()
 
     data = _api_call(client.get_stats, spinner_text="Fetching stats...")
 
@@ -1029,7 +1099,7 @@ def authors(
       eip-search authors
       eip-search authors --page 2 -n 20
     """
-    from eip_search import client
+    client = _get_client()
 
     params = {"page": page, "per_page": per_page or 25}
     data = _api_call(client.list_authors, params, spinner_text="Fetching authors...")
@@ -1055,7 +1125,7 @@ def author(
       eip-search author Metasploit
       eip-search author "Chocapikk" --page 2
     """
-    from eip_search import client
+    client = _get_client()
 
     params = {"page": page, "per_page": per_page or 25}
     data = _api_call(client.get_author, name, spinner_text=f"Fetching author {name}...", params=params)
@@ -1082,7 +1152,7 @@ def cwes(
       eip-search cwes
       eip-search cwes --json
     """
-    from eip_search import client
+    client = _get_client()
 
     data = _api_call(client.list_cwes, spinner_text="Fetching CWEs...")
 
@@ -1108,7 +1178,7 @@ def cwe(
       eip-search cwe 79
       eip-search cwe CWE-89
     """
-    from eip_search import client
+    client = _get_client()
 
     normalized = cwe_id.strip()
     if normalized.isdigit():
@@ -1138,7 +1208,7 @@ def vendors(
       eip-search vendors
       eip-search vendors --json
     """
-    from eip_search import client
+    client = _get_client()
 
     data = _api_call(client.list_vendors, spinner_text="Fetching vendors...")
 
@@ -1165,7 +1235,7 @@ def products(
       eip-search products apache
       eip-search products microsoft --json
     """
-    from eip_search import client
+    client = _get_client()
 
     data = _api_call(client.list_vendor_products, vendor, spinner_text=f"Fetching products for {vendor}...")
 
@@ -1192,7 +1262,7 @@ def lookup(
       eip-search lookup EDB-45961
       eip-search lookup GHSA-jfh8-c2jp-5v3q
     """
-    from eip_search import client
+    client = _get_client()
 
     data = _api_call(client.lookup_alt_id, alt_id, spinner_text=f"Looking up {alt_id}...")
 
@@ -1201,6 +1271,157 @@ def lookup(
     else:
         from eip_search.display import print_lookup_result
         print_lookup_result(data)
+
+
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  ANALYSIS COMMAND                                                       ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+
+@_app.command()
+def analysis(
+    target: str = typer.Argument(..., help="Exploit ID or CVE-ID (e.g. 61514 or CVE-2024-3400)"),
+) -> None:
+    """Show AI analysis for an exploit (classification, attack type, MITRE, etc.).
+
+    \b
+    Accepts an exploit ID or a CVE ID.  When given a CVE, shows an
+    interactive picker to choose which exploit to analyze.
+
+    \b
+    Examples:
+      eip-search analysis 61514
+      eip-search analysis CVE-2024-3400
+      eip-search --offline analysis 61514
+    """
+    from eip_search.display import print_exploit_analysis
+
+    exploit_id = _resolve_exploit_id(target)
+    client = _get_client()
+    exploit = _api_call(client.get_exploit_analysis, exploit_id, spinner_text=f"Fetching analysis for exploit {exploit_id}...")
+    print_exploit_analysis(exploit)
+
+
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  UPDATE-DB COMMAND                                                      ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+
+@_app.command(name="update-db")
+def update_db(
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Output path for the database"),
+) -> None:
+    """Download or update the offline EIP database.
+
+    \b
+    Downloads the latest EIP vulnerability intelligence database for
+    offline use.  The database is ~200 MB compressed (~900 MB on disk).
+
+    \b
+    By default saved to ~/.eip/eip.db.
+
+    \b
+    Examples:
+      eip-search update-db
+      eip-search update-db -o /path/to/eip.db
+    """
+    import email.utils
+    import gzip
+    from pathlib import Path
+
+    import httpx
+    from rich.progress import (
+        BarColumn,
+        DownloadColumn,
+        Progress,
+        SpinnerColumn,
+        TransferSpeedColumn,
+    )
+
+    from eip_search.config import get_config, DEFAULT_DB_URL
+    from eip_search.local_client import DEFAULT_DB_PATH
+
+    cfg = get_config()
+    db_path = Path(output) if output else Path(cfg.db_path or str(DEFAULT_DB_PATH))
+    db_url = cfg.db_url or DEFAULT_DB_URL
+
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    headers = {"User-Agent": f"eip-search/{__version__}"}
+    if db_path.exists():
+        mtime = db_path.stat().st_mtime
+        headers["If-Modified-Since"] = email.utils.formatdate(mtime, usegmt=True)
+        size_mb = db_path.stat().st_size / 1024 / 1024
+        console.print(f"\n  Checking for updates (current: {size_mb:.0f} MB)...")
+    else:
+        console.print(f"\n  Downloading EIP database to {db_path}...")
+
+    try:
+        timeout = httpx.Timeout(connect=10.0, read=300.0, write=10.0, pool=10.0)
+        with httpx.Client(timeout=timeout, follow_redirects=True) as http:
+            with http.stream("GET", db_url, headers=headers) as resp:
+                if resp.status_code == 304:
+                    console.print("  [green]Database is already up to date.[/green]\n")
+                    return
+
+                if resp.status_code >= 400:
+                    from eip_search.display import print_error
+                    print_error(f"Download failed: HTTP {resp.status_code}")
+                    raise typer.Exit(1)
+
+                total = int(resp.headers.get("content-length", 0))
+                tmp_gz = db_path.with_suffix(".db.gz.tmp")
+
+                with Progress(
+                    SpinnerColumn(),
+                    "[progress.description]{task.description}",
+                    BarColumn(),
+                    DownloadColumn(),
+                    TransferSpeedColumn(),
+                    console=console,
+                ) as progress:
+                    task = progress.add_task("  Downloading", total=total or None)
+                    with open(tmp_gz, "wb") as f:
+                        for chunk in resp.iter_bytes(chunk_size=65536):
+                            f.write(chunk)
+                            progress.update(task, advance=len(chunk))
+
+    except httpx.HTTPError as exc:
+        from eip_search.display import print_error
+        print_error(f"Download failed: {exc}")
+        raise typer.Exit(1)
+
+    # Detect gzip (magic bytes 1f 8b) and decompress if needed
+    console.print("  Decompressing...")
+    tmp_db = db_path.with_suffix(".db.tmp")
+
+    with open(tmp_gz, "rb") as f:
+        magic = f.read(2)
+
+    try:
+        if magic == b"\x1f\x8b":
+            with gzip.open(tmp_gz, "rb") as gz_in:
+                with open(tmp_db, "wb") as f_out:
+                    while True:
+                        chunk = gz_in.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        f_out.write(chunk)
+            tmp_gz.unlink(missing_ok=True)
+        else:
+            # Already uncompressed
+            tmp_gz.rename(tmp_db)
+    except Exception as exc:
+        from eip_search.display import print_error
+        tmp_gz.unlink(missing_ok=True)
+        tmp_db.unlink(missing_ok=True)
+        print_error(f"Decompression failed: {exc}")
+        raise typer.Exit(1)
+
+    # Atomic replace
+    tmp_db.replace(db_path)
+
+    size_mb = db_path.stat().st_size / 1024 / 1024
+    console.print(f"\n  [green]Database ready: {db_path} ({size_mb:.0f} MB)[/green]")
+    console.print("  [dim]Use --offline to search the local database[/dim]\n")
 
 
 # ---------------------------------------------------------------------------
