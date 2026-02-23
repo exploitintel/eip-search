@@ -739,9 +739,29 @@ vision_model = "qwen3-vl:235b-instruct-cloud"
 | `eip-search cwe ID` | CWE detail (accepts `79` or `CWE-79`) |
 | `eip-search vendors` | Top vendors ranked by vulnerability count |
 | `eip-search products VENDOR` | Products for a vendor (discover CPE names for filtering) |
+| `eip-search analysis ID-or-CVE` | Full AI analysis for an exploit (classification, MITRE, trojan indicators) |
 | `eip-search lookup ALT-ID` | Resolve EDB/GHSA identifier to CVE |
+| `eip-search update-db` | Download/update the offline SQLite database |
 
-The `view` and `download` commands accept either an exploit ID (e.g. `77423`) or a CVE ID (e.g. `CVE-2024-3400`). When given a CVE, they show an interactive picker ranked by exploit quality.
+The `view`, `download`, and `analysis` commands accept either an exploit ID (e.g. `77423`) or a CVE ID (e.g. `CVE-2024-3400`). When given a CVE, they show an interactive picker ranked by exploit quality.
+
+### Offline Mode
+
+All read-only commands work offline with a local SQLite database:
+
+```bash
+eip-search update-db                       # download the database (~200 MB compressed)
+eip-search --offline search "apache httpd"  # search locally
+eip-search --offline info CVE-2024-3400     # full detail from local DB
+eip-search --db /path/to/eip.db search "log4j"  # custom DB path (implies --offline)
+```
+
+Configure defaults in `~/.eip/config.toml`:
+
+```toml
+[offline]
+db_path = "/path/to/eip.db"
+```
 
 ## Search Filters
 
