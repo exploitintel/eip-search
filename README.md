@@ -756,12 +756,29 @@ eip-search --offline info CVE-2024-3400     # full detail from local DB
 eip-search --db /path/to/eip.db search "log4j"  # custom DB path (implies --offline)
 ```
 
-Configure defaults in `~/.eip/config.toml`:
+#### Offline Exploit Code
+
+Sync the exploit archive to enable `view` and `download` offline:
+
+```bash
+rsync -avz rsync://rsync.exploit-intel.com/exploits/ ~/eip-exploits/
+```
+
+Configure in `~/.eip-search.toml`:
 
 ```toml
 [offline]
-db_path = "/path/to/eip.db"
+exploits_dir = "~/eip-exploits"
 ```
+
+Then `view` and `download` work without an internet connection:
+
+```bash
+eip-search --offline view CVE-2024-3400      # view exploit source code locally
+eip-search --offline download 77423 -x       # copy and extract local archive
+```
+
+The archive contains ~22K repos (~28 GB). Both the database and archive are rebuilt 4x daily.
 
 ## Search Filters
 

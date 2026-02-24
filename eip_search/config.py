@@ -36,6 +36,7 @@ class Config:
     code_model: str = DEFAULT_CODE_MODEL
     db_path: str | None = None
     db_url: str | None = None
+    exploits_dir: str | None = None
 
     @classmethod
     def load(cls) -> Config:
@@ -63,6 +64,7 @@ class Config:
             code_model=gen_section.get("code_model", DEFAULT_CODE_MODEL),
             db_path=offline_section.get("db_path"),
             db_url=offline_section.get("db_url"),
+            exploits_dir=offline_section.get("exploits_dir"),
         )
 
 

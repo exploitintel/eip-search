@@ -53,7 +53,7 @@ def _get_client():
         cfg = get_config()
         db_path = _db_override or cfg.db_path or str(DEFAULT_DB_PATH)
         try:
-            _local_client_instance = LocalClient(db_path)
+            _local_client_instance = LocalClient(db_path, exploits_dir=cfg.exploits_dir)
         except FileNotFoundError:
             from eip_search.display import print_error
             print_error(
@@ -394,12 +394,8 @@ def view(
       eip-search view CVE-2024-3400
       eip-search view 77423 --file exploit.py
     """
-    if _offline_mode:
-        from eip_search.display import print_error
-        print_error("Viewing exploit code requires the API. Remove --offline to use this command.")
-        raise typer.Exit(1)
-    from eip_search import client
     from eip_search.display import print_code, print_exploit_files
+    client = _get_client()
 
     exploit_id = _resolve_exploit_id(target)
 
@@ -483,13 +479,9 @@ def download(
       eip-search download 77423 --extract
       eip-search download 77423 -x -o /tmp/exploits
     """
-    if _offline_mode:
-        from eip_search.display import print_error
-        print_error("Downloading exploits requires the API. Remove --offline to use this command.")
-        raise typer.Exit(1)
     import zipfile
     from pathlib import Path
-    from eip_search import client
+    client = _get_client()
 
     exploit_id = _resolve_exploit_id(target, code_only=True)
 
@@ -503,48 +495,68 @@ def download(
         output_dir=dest,
     )
 
-    console.print(f"\n[bold green]Downloaded:[/bold green] {out_path}")
-    console.print("[dim]ZIP password: [bold]eip[/bold] (exploit archives are password-protected to prevent AV quarantine)[/dim]")
+    if _offline_mode:
+        console.print(f"\n[bold green]Downloaded:[/bold green] {out_path}")
+    else:
+        console.print(f"\n[bold green]Downloaded:[/bold green] {out_path}")
+        console.print("[dim]ZIP password: [bold]eip[/bold] (exploit archives are password-protected to prevent AV quarantine)[/dim]")
 
     if extract:
         extract_dir = dest / out_path.stem
+        is_tarball = str(out_path).endswith((".tar.gz", ".tgz"))
+
         try:
-            with zipfile.ZipFile(out_path, "r") as zf:
-                # Create destination directory before validation/extraction
+            if is_tarball:
+                import tarfile as _tarfile
                 extract_dir.mkdir(parents=True, exist_ok=True)
+                with _tarfile.open(out_path, "r:gz") as tar:
+                    # Validate all paths BEFORE extracting
+                    resolved_target = extract_dir.resolve()
+                    for member in tar.getmembers():
+                        member_path = (extract_dir / member.name).resolve()
+                        try:
+                            member_path.relative_to(resolved_target)
+                        except ValueError:
+                            from eip_search.display import print_error
+                            print_error(f"Blocked path traversal: {member.name}")
+                            raise typer.Exit(1)
+                    tar.extractall(path=extract_dir, filter="data")
+            else:
+                extract_dir.mkdir(parents=True, exist_ok=True)
+                with zipfile.ZipFile(out_path, "r") as zf:
+                    # Basic zip-bomb limits
+                    infos = zf.infolist()
+                    max_files = 5000
+                    max_total_uncompressed = 250 * 1024 * 1024  # 250 MB
 
-                # Basic zip-bomb limits (exploit archives should be small)
-                infos = zf.infolist()
-                max_files = 5000
-                max_total_uncompressed = 250 * 1024 * 1024  # 250 MB
-
-                if len(infos) > max_files:
-                    from eip_search.display import print_error
-                    print_error(f"Archive contains too many files ({len(infos)} > {max_files}) — aborting")
-                    raise typer.Exit(1)
-
-                total_uncompressed = sum(i.file_size for i in infos)
-                if total_uncompressed > max_total_uncompressed:
-                    from eip_search.display import print_error
-                    print_error(
-                        f"Archive expands to {total_uncompressed / (1024*1024):.1f} MB "
-                        f"({max_total_uncompressed / (1024*1024):.0f} MB limit) — aborting"
-                    )
-                    raise typer.Exit(1)
-
-                # Validate all paths BEFORE extracting (prevent zip-slip attacks)
-                resolved_target = extract_dir.resolve()
-                for info in infos:
-                    member = info.filename
-                    member_path = (extract_dir / member).resolve()
-                    try:
-                        member_path.relative_to(resolved_target)
-                    except ValueError:
+                    if len(infos) > max_files:
                         from eip_search.display import print_error
-                        print_error(f"Blocked zip-slip path traversal: {member}")
+                        print_error(f"Archive contains too many files ({len(infos)} > {max_files}) — aborting")
                         raise typer.Exit(1)
 
-                zf.extractall(path=extract_dir, pwd=b"eip")
+                    total_uncompressed = sum(i.file_size for i in infos)
+                    if total_uncompressed > max_total_uncompressed:
+                        from eip_search.display import print_error
+                        print_error(
+                            f"Archive expands to {total_uncompressed / (1024*1024):.1f} MB "
+                            f"({max_total_uncompressed / (1024*1024):.0f} MB limit) — aborting"
+                        )
+                        raise typer.Exit(1)
+
+                    # Validate all paths BEFORE extracting (prevent zip-slip attacks)
+                    resolved_target = extract_dir.resolve()
+                    for info in infos:
+                        member = info.filename
+                        member_path = (extract_dir / member).resolve()
+                        try:
+                            member_path.relative_to(resolved_target)
+                        except ValueError:
+                            from eip_search.display import print_error
+                            print_error(f"Blocked zip-slip path traversal: {member}")
+                            raise typer.Exit(1)
+
+                    zf.extractall(path=extract_dir, pwd=b"eip")
+
             console.print(f"[bold green]Extracted:[/bold green]  {extract_dir}/")
 
             # List extracted files
@@ -557,12 +569,9 @@ def download(
                     console.print(f"  [dim]-[/dim] {rel}")
                 if len(files) > 15:
                     console.print(f"  [dim]... and {len(files) - 15} more[/dim]")
-        except zipfile.BadZipFile:
-            from eip_search.display import print_error
-            print_error("Downloaded file is not a valid ZIP archive")
-        except typer.Exit:
-            raise
-        except Exception as exc:
+        except (zipfile.BadZipFile, Exception) as exc:
+            if isinstance(exc, typer.Exit):
+                raise
             from eip_search.display import print_error
             print_error(f"Extraction failed: {exc}")
 

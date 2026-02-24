@@ -14,12 +14,16 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
+import shutil
+import tarfile
+
 from eip_search.client import APIError
 from eip_search.models import (
     AffectedProduct,
     AltIdentifier,
     Exploit,
     ExploitBrowseResult,
+    ExploitFile,
     ExploitWithCVE,
     NucleiTemplate,
     SearchResult,
@@ -36,7 +40,7 @@ DEFAULT_DB_URL = "https://repo.exploit-intel.com/data/eip.db.gz"
 class LocalClient:
     """SQLite-backed client matching the HTTP client module's function signatures."""
 
-    def __init__(self, db_path: str | Path | None = None):
+    def __init__(self, db_path: str | Path | None = None, exploits_dir: str | Path | None = None):
         self._db_path = Path(db_path) if db_path else DEFAULT_DB_PATH
         if not self._db_path.exists():
             raise FileNotFoundError(
@@ -44,6 +48,9 @@ class LocalClient:
                 f"Download it with: eip-search update-db"
             )
         self._conn: sqlite3.Connection | None = None
+        self._exploits_dir: Path | None = (
+            Path(exploits_dir).expanduser() if exploits_dir else None
+        )
 
     @property
     def db_path(self) -> Path:
@@ -782,31 +789,235 @@ class LocalClient:
             cvss_v3_score=row["cvss_v3_score"],
         )
 
-    # ── Online-only stubs ─────────────────────────────────────────────
+    # ── Local exploit code access ────────────────────────────────────
 
-    def list_exploit_files(self, exploit_id: int) -> list:
-        raise APIError(
-            501,
-            "Exploit file browsing is not available offline. "
-            "Remove --offline to use the API.",
-        )
+    def _resolve_exploit_path(self, exploit_id: int) -> Path | None:
+        """Look up an exploit's local archive path and resolve it against exploits_dir."""
+        if self._exploits_dir is None:
+            return None
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT local_path FROM exploits WHERE id = ?", (exploit_id,),
+        ).fetchone()
+        if row is None or row["local_path"] is None:
+            return None
+        rel = row["local_path"]
+        # local_path is relative like "exploits/CVE-2024-3400/owner--repo.tar.gz"
+        # exploits_dir points to the root of the rsynced archive (the "exploits/" dir)
+        # Strip the "exploits/" prefix since the user's dir IS the exploits dir
+        if rel.startswith("exploits/"):
+            rel = rel[len("exploits/"):]
+        p = self._exploits_dir / rel
+        if p.exists():
+            return p
+        return None
+
+    def list_exploit_files(self, exploit_id: int) -> list[ExploitFile]:
+        """List files in a local exploit archive."""
+        archive = self._resolve_exploit_path(exploit_id)
+        if archive is None:
+            if self._exploits_dir is None:
+                raise APIError(
+                    501,
+                    "Exploit file browsing requires a local exploits directory.\n"
+                    "Set exploits_dir in ~/.eip-search.toml under [offline]:\n\n"
+                    "  [offline]\n"
+                    "  exploits_dir = \"~/eip-exploits\"\n\n"
+                    "Then sync exploits:\n"
+                    "  RSYNC_PASSWORD=eippassword rsync -avz "
+                    "rsync://eiprsync@rsync.exploit-intel.com/exploits/ ~/eip-exploits/",
+                )
+            raise APIError(404, f"No local code found for exploit {exploit_id}")
+
+        return _list_local_files(archive)
 
     def get_exploit_code(self, exploit_id: int, file_path: str) -> str:
-        raise APIError(
-            501,
-            "Exploit code viewing is not available offline. "
-            "Remove --offline to use the API.",
-        )
+        """Read a file from a local exploit archive."""
+        archive = self._resolve_exploit_path(exploit_id)
+        if archive is None:
+            if self._exploits_dir is None:
+                raise APIError(
+                    501,
+                    "Exploit code viewing requires a local exploits directory.\n"
+                    "Set exploits_dir in ~/.eip-search.toml under [offline].",
+                )
+            raise APIError(404, f"No local code found for exploit {exploit_id}")
+
+        content = _read_local_file(archive, file_path)
+        if content is None:
+            raise APIError(404, f"File not found in archive: {file_path}")
+        return content
 
     def download_exploit(self, exploit_id: int, output_dir=None):
-        raise APIError(
-            501,
-            "Exploit downloads are not available offline. "
-            "Remove --offline to use the API.",
-        )
+        """Copy the local exploit archive to the output directory."""
+        archive = self._resolve_exploit_path(exploit_id)
+        if archive is None:
+            if self._exploits_dir is None:
+                raise APIError(
+                    501,
+                    "Exploit downloads require a local exploits directory.\n"
+                    "Set exploits_dir in ~/.eip-search.toml under [offline].",
+                )
+            raise APIError(404, f"No local code found for exploit {exploit_id}")
+
+        dest_dir = Path(output_dir) if output_dir else Path.cwd()
+        dest = dest_dir / archive.name
+        shutil.copy2(archive, dest)
+        return dest
 
 
 # ── Helpers ───────────────────────────────────────────────────────────
+
+
+# File extensions considered as viewable code
+_CODE_EXTENSIONS = {
+    ".py", ".rb", ".pl", ".sh", ".bash", ".zsh", ".ps1", ".psm1", ".bat", ".cmd",
+    ".c", ".cpp", ".h", ".hpp", ".java", ".go", ".rs", ".cs",
+    ".js", ".ts", ".jsx", ".tsx", ".mjs",
+    ".php", ".lua", ".r", ".swift", ".kt", ".scala", ".groovy",
+    ".sql", ".xml", ".html", ".htm", ".css", ".json", ".yaml", ".yml", ".toml",
+    ".patch", ".diff",
+    ".md", ".txt", ".rst", ".cfg", ".conf", ".ini", ".env.example",
+    ".dockerfile", ".makefile", ".cmake",
+}
+_MAX_CODE_SIZE = 100_000
+_MAX_FILES_LIST = 50
+
+
+def _list_local_files(archive: Path) -> list[ExploitFile]:
+    """List code files in a .tar.gz archive or directory."""
+    if archive.is_dir():
+        return _list_dir_files(archive)
+    if archive.suffix == ".gz" and archive.stem.endswith(".tar"):
+        return _list_tar_files(archive)
+    # Single file
+    if archive.is_file() and archive.suffix.lower() in _CODE_EXTENSIONS:
+        return [ExploitFile(name=archive.name, path=archive.name, size=archive.stat().st_size)]
+    return []
+
+
+def _list_tar_files(archive: Path) -> list[ExploitFile]:
+    """List code files inside a .tar.gz archive."""
+    files: list[ExploitFile] = []
+    try:
+        with tarfile.open(archive, "r:gz") as tar:
+            for member in tar:
+                if not member.isfile():
+                    continue
+                if member.issym() or member.islnk():
+                    continue
+                if member.size > _MAX_CODE_SIZE:
+                    continue
+                name = Path(member.name).name
+                ext = Path(name).suffix.lower()
+                if ext in _CODE_EXTENSIONS or name.lower() in (
+                    "readme", "license", "makefile", "dockerfile", "rakefile",
+                ):
+                    files.append(ExploitFile(
+                        name=name, path=member.name, size=member.size,
+                    ))
+                if len(files) >= _MAX_FILES_LIST:
+                    break
+    except (tarfile.TarError, OSError):
+        pass
+
+    # Sort: README first, then code files, then rest
+    def sort_key(f: ExploitFile):
+        n = f.name.lower()
+        if n.startswith("readme"):
+            return (0, n)
+        if any(n.endswith(ext) for ext in (".py", ".rb", ".c", ".go", ".js")):
+            return (1, n)
+        return (2, n)
+
+    files.sort(key=sort_key)
+    return files
+
+
+def _list_dir_files(dir_path: Path) -> list[ExploitFile]:
+    """List code files in a directory."""
+    files: list[ExploitFile] = []
+    try:
+        for entry in sorted(dir_path.iterdir()):
+            if not entry.is_file():
+                continue
+            ext = entry.suffix.lower()
+            size = entry.stat().st_size
+            if size <= _MAX_CODE_SIZE and (
+                ext in _CODE_EXTENSIONS
+                or entry.name.lower() in ("readme", "license", "makefile")
+            ):
+                files.append(ExploitFile(
+                    name=entry.name, path=entry.name, size=size,
+                ))
+            if len(files) >= _MAX_FILES_LIST:
+                break
+    except OSError:
+        pass
+    return files
+
+
+def _read_local_file(archive: Path, file_path: str) -> str | None:
+    """Read a file from a .tar.gz archive, directory, or single file."""
+    # Security: block path traversal
+    if ".." in file_path or file_path.startswith("/"):
+        return None
+
+    if archive.is_dir():
+        return _read_dir_file(archive, file_path)
+    if archive.suffix == ".gz" and archive.stem.endswith(".tar"):
+        return _read_tar_file(archive, file_path)
+    # Single file — serve if name matches
+    if archive.is_file() and Path(file_path).name == archive.name:
+        try:
+            return archive.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return None
+    return None
+
+
+def _read_tar_file(archive: Path, file_path: str) -> str | None:
+    """Read a single file from a .tar.gz archive."""
+    if ".." in file_path or file_path.startswith("/"):
+        return None
+    try:
+        with tarfile.open(archive, "r:gz") as tar:
+            member = tar.getmember(file_path)
+            if not member.isfile() or member.issym() or member.islnk():
+                return None
+            if member.size > _MAX_CODE_SIZE:
+                return None
+            f = tar.extractfile(member)
+            if f is None:
+                return None
+            content = f.read()
+            try:
+                return content.decode("utf-8")
+            except UnicodeDecodeError:
+                try:
+                    return content.decode("latin-1")
+                except UnicodeDecodeError:
+                    return None
+    except (tarfile.TarError, KeyError, OSError):
+        return None
+
+
+def _read_dir_file(dir_path: Path, filename: str) -> str | None:
+    """Read a single file from a directory. Only basename allowed."""
+    safe_name = Path(filename).name
+    if safe_name != filename or ".." in filename:
+        return None
+    file_path = dir_path / safe_name
+    try:
+        file_path.resolve().relative_to(dir_path.resolve())
+    except ValueError:
+        return None
+    if not file_path.is_file() or file_path.stat().st_size > _MAX_CODE_SIZE:
+        return None
+    try:
+        return file_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
 
 
 def _fts_escape(query: str) -> str:
