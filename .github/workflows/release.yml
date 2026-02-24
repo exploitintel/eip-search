@@ -1,0 +1,195 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  # ── 1. Build PyPI packages ─────────────────────────────────────────────────
+  build-pypi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: pip install build twine
+
+      - name: Build wheel + sdist
+        run: python -m build
+
+      - name: Validate packages
+        run: twine check dist/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pypi-packages
+          path: dist/*
+
+  # ── 2. Build .deb packages (per-distro, per-arch via Docker) ───────────────
+  build-deb:
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    strategy:
+      matrix:
+        distro:
+          - { name: ubuntu-jammy,     image: "ubuntu:22.04",              tag: ubuntu-jammy,     suite: jammy }
+          - { name: ubuntu-noble,     image: "ubuntu:24.04",              tag: ubuntu-noble,     suite: noble }
+          - { name: ubuntu-plucky,    image: "ubuntu:25.04",              tag: ubuntu-plucky,    suite: plucky }
+          - { name: ubuntu-questing,  image: "ubuntu:25.10",              tag: ubuntu-questing,  suite: questing }
+          - { name: debian-bookworm,  image: "debian:12",                 tag: debian-bookworm,  suite: bookworm }
+          - { name: debian-trixie,    image: "debian:13",                 tag: debian-trixie,    suite: trixie }
+          - { name: kali,             image: "kalilinux/kali-rolling",    tag: kali-rolling,     suite: kali-rolling }
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version
+        id: ver
+        run: |
+          VERSION=$(grep '^__version__' eip_search/__init__.py | cut -d'"' -f2)
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Build .deb in Docker
+        run: |
+          docker build \
+            --build-arg BASE_IMAGE="${{ matrix.distro.image }}" \
+            --build-arg DISTRO_TAG="${{ matrix.distro.tag }}" \
+            --build-arg SUITE="${{ matrix.distro.suite }}" \
+            --build-arg VERSION="${{ steps.ver.outputs.version }}" \
+            -f packaging/deb/Dockerfile \
+            -t eip-search-deb-${{ matrix.distro.name }}-${{ matrix.arch }} \
+            .
+
+      - name: Extract .deb
+        run: |
+          mkdir -p dist
+          container=$(docker create eip-search-deb-${{ matrix.distro.name }}-${{ matrix.arch }})
+          docker cp "${container}:/out/." dist/
+          docker rm "${container}" > /dev/null
+          # Rename: the Dockerfile produces the arch from dpkg, but ensure consistent naming
+          for f in dist/*.deb; do
+            [ -f "$f" ] && echo "Built: $(basename $f) ($(du -h $f | cut -f1))"
+          done
+
+      - name: Smoke test
+        run: |
+          DEB=$(ls dist/*.deb | head -1)
+          docker run --rm \
+            -v "$(pwd)/dist:/pkg:ro" \
+            "${{ matrix.distro.image }}" \
+            bash -c "apt-get update -qq >/dev/null 2>&1 && \
+                     apt-get install -y -qq /pkg/$(basename ${DEB}) >/dev/null 2>&1 && \
+                     eip-search --version"
+          echo "PASS: $(basename ${DEB})"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deb-${{ matrix.distro.tag }}-${{ matrix.arch }}
+          path: dist/*.deb
+
+  # ── 3. Build Windows .exe ──────────────────────────────────────────────────
+  build-exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install .
+          pip install pyinstaller
+
+      - name: Build exe
+        run: |
+          pyinstaller --onefile --name eip-search `
+            --hidden-import shellingham.nt `
+            --collect-all rich `
+            eip_search/__main__.py
+
+      - name: Verify exe
+        run: dist\eip-search.exe --version
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-exe
+          path: dist/eip-search.exe
+
+  # ── 4. Publish: PyPI + GitHub Release + APT repo ──────────────────────────
+  publish:
+    needs: [build-pypi, build-deb, build-exe]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version
+        id: ver
+        run: |
+          VERSION=$(grep '^__version__' eip_search/__init__.py | cut -d'"' -f2)
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect artifacts into dist/
+        run: |
+          mkdir -p dist
+          cp artifacts/pypi-packages/*.whl dist/
+          cp artifacts/pypi-packages/*.tar.gz dist/
+          cp artifacts/deb-*/*.deb dist/
+          cp artifacts/windows-exe/eip-search.exe dist/
+          echo "==> Release artifacts:"
+          ls -lh dist/
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Upload to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          pip install twine
+          twine upload --skip-existing dist/*.whl dist/*.tar.gz
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          gh release create "${TAG}" \
+            --title "${TAG}" \
+            --generate-notes \
+            dist/*.deb dist/*.whl dist/*.tar.gz dist/*.exe
+
+      - name: Upload to APT repo
+        env:
+          REPO_SSH_KEY: ${{ secrets.REPO_SSH_KEY }}
+          REPO_HOST: ${{ secrets.REPO_HOST }}
+        run: |
+          if [ -z "$REPO_SSH_KEY" ] || [ -z "$REPO_HOST" ]; then
+            echo "REPO_SSH_KEY or REPO_HOST not set — skipping APT repo upload"
+            exit 0
+          fi
+
+          mkdir -p ~/.ssh
+          echo "$REPO_SSH_KEY" > ~/.ssh/repo_key
+          chmod 600 ~/.ssh/repo_key
+          ssh-keyscan "${REPO_HOST}" >> ~/.ssh/known_hosts 2>/dev/null
+
+          scp -i ~/.ssh/repo_key dist/*.deb "root@${REPO_HOST}:/var/www/apt/incoming/"
+          ssh -i ~/.ssh/repo_key "root@${REPO_HOST}" "bash /root/upload-debs.sh"
+
+          rm -f ~/.ssh/repo_key
