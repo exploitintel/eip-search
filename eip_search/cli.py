@@ -121,7 +121,7 @@ def _api_call(func, *args, spinner_text: str = "Querying API...", **kwargs):
         except APIError as exc:
             from eip_search.display import print_error
             if exc.status_code == 404:
-                print_error(f"Not found: {exc.message}")
+                print_error(exc.message)
             elif exc.status_code == 429:
                 print_error(f"Rate limited. {exc.message}")
             else:
@@ -166,7 +166,7 @@ def search(
     Examples:
       eip-search search "apache httpd" --has-exploits
       eip-search search "fortinet" --severity critical --kev
-      eip-search search --vendor paloalto --min-epss 0.5 --sort epss_desc
+      eip-search search --vendor paloaltonetworks --min-epss 0.5 --sort epss_desc
       eip-search search --cwe 89 --has-exploits --sort cvss_desc
     """
     has_filters = any([
@@ -209,13 +209,14 @@ def main(
     \b
     Search with filters:
       eip-search search "fortinet" --severity critical --has-exploits --kev
-      eip-search search --vendor paloalto --min-epss 0.5
+      eip-search search --vendor paloaltonetworks --min-epss 0.5
 
     \b
     Offline mode (requires local database):
       eip-search update-db                  Download offline database
       eip-search --offline search "apache"  Search locally
       eip-search --db /path/to/eip.db info CVE-2024-3400
+    Note: --offline and --db are global flags and must appear BEFORE the command.
 
     \b
     Other commands:

@@ -84,6 +84,18 @@ def _handle_response(resp: httpx.Response) -> dict[str, Any]:
         message = data.get("message") or f"Rate limited. Try again in {retry_after}s."
         raise APIError(429, message, retry_after=retry_after)
 
+    if resp.status_code == 422:
+        detail = data.get("detail")
+        if isinstance(detail, list) and detail:
+            err = detail[0]
+            loc = err.get("loc", [])
+            field = loc[-1] if loc else "parameter"
+            msg_text = err.get("msg", "invalid value")
+            message = f"Invalid value for '--{field}': {msg_text} (--min-cvss 0-10, --min-epss 0-1)"
+        else:
+            message = data.get("message") or "Invalid parameter value (check ranges: --min-cvss 0-10, --min-epss 0-1)"
+        raise APIError(422, message)
+
     if resp.status_code >= 400:
         message = data.get("message") or data.get("detail") or f"API error: HTTP {resp.status_code}"
         raise APIError(resp.status_code, message)
