@@ -51,7 +51,7 @@ RUN DEB_ARCH=$(dpkg --print-architecture) && mkdir /out && fpm \
     -v "${VERSION}~${SUITE}" \
     -a "${DEB_ARCH}" \
     --description "CLI intelligence tool for the Exploit Intelligence Platform — a modern searchsploit replacement" \
-    --url "https://codeberg.org/exploit-intel/eip-search" \
+    --url "https://github.com/exploitintel/eip-search" \
     --license "MIT" \
     --maintainer "Exploit Intelligence Platform" \
     --vendor "Exploit Intelligence Platform" \
