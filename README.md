@@ -8,17 +8,17 @@ Package/command: `eip-search`
 
 A modern **searchsploit replacement** powered by the [Exploit Intelligence Platform](https://exploit-intel.com).
 
-Search 370K+ vulnerabilities and 105K+ exploits from 4 sources with risk intelligence, exploit quality ranking, Nuclei scanner integration, and trojan warnings — all from your terminal.
+Search hundreds of thousands of vulnerabilities and exploits from multiple sources with risk intelligence, exploit quality ranking, Nuclei scanner integration, and trojan warnings — all from your terminal.
 
-![eip-search CLI screenshot](https://codeberg.org/exploit-intel/eip-search/raw/branch/main/eip-search.png)
+![eip-search CLI screenshot](https://raw.githubusercontent.com/exploitintel/eip-search/main/eip-search.png)
 
 Part of the same project family:
-- [`eip-search`](https://codeberg.org/exploit-intel/eip-search) — terminal client
-- [`eip-mcp`](https://codeberg.org/exploit-intel/eip-mcp) — MCP server for AI assistants
+- [`eip-search`](https://github.com/exploitintel/eip-search) — terminal client
+- [`eip-mcp`](https://github.com/exploitintel/eip-mcp) — MCP server for AI assistants
 
 ## Highlights
 
-- Search 370K+ vulnerabilities and 105K+ exploits from one CLI
+- Search large-scale vulnerability and exploit intelligence from one CLI
 - Browse exploits directly by source, language, vendor, or attack type
 - **Generate PoC exploits** for any CVE using a local LLM (Ollama) with optional vision pipeline for writeup screenshots
 - Download exploit code by CVE ID — interactive picker selects the best match
@@ -66,15 +66,17 @@ eip-search --version
 ### Kali Linux / Debian / Ubuntu
 
 ```bash
-# Python 3 is pre-installed on Kali. Install pip if needed:
-sudo apt update && sudo apt install -y python3-pip python3-venv
+# Option 1: Native APT repo (recommended on Kali/Debian/Ubuntu)
+curl -fsSL https://repo.exploit-intel.com/setup.sh | sudo bash
+sudo apt install -y eip-search
 
-# Option 1: Install into a virtual environment (recommended)
+# Option 2: Install into a virtual environment
+sudo apt update && sudo apt install -y python3-pip python3-venv
 python3 -m venv ~/.venvs/eip
 source ~/.venvs/eip/bin/activate
 pip install eip-search
 
-# Option 2: Install with pipx (isolated, no venv management)
+# Option 3: Install with pipx (isolated, no venv management)
 sudo apt install -y pipx
 pipx install eip-search
 
@@ -82,7 +84,7 @@ pipx install eip-search
 eip-search --version
 ```
 
-> **Kali users**: If you see `error: externally-managed-environment`, use one of the virtual environment methods above. Kali 2024+ enforces PEP 668 which blocks global pip installs.
+> **Kali users**: If you see `error: externally-managed-environment`, use APT, `pipx`, or a virtual environment. Kali 2024+ enforces PEP 668 and blocks global pip installs.
 
 ### Windows
 
@@ -114,7 +116,7 @@ pipx install eip-search
 ### From Source (all platforms)
 
 ```bash
-git clone git@codeberg.org:exploit-intel/eip-search.git
+git clone https://github.com/exploitintel/eip-search.git
 cd eip-search
 python3 -m venv .venv
 source .venv/bin/activate      # Linux/macOS
@@ -122,74 +124,7 @@ source .venv/bin/activate      # Linux/macOS
 pip install -e .
 ```
 
-## Building Packages
-
-### Build Dependencies
-
-| Target | Requirements |
-|---|---|
-| `make build` | Python 3, `build` module (`pip install build`) |
-| `make check` / `make pypi` | `twine` (`pip install twine`) |
-| `make deb` | Docker |
-| `make tag-release` | Python 3 (version bump only — Forgejo Actions handles the rest) |
-| `make release` | All of the above + `tea` CLI ([codeberg.org/gitea/tea](https://codeberg.org/gitea/tea)) |
-
-Install everything at once:
-
-```bash
-pip install build twine
-# Docker: https://docs.docker.com/get-docker/
-# tea CLI: https://codeberg.org/gitea/tea
-```
-
-The Makefile checks for each dependency before running and will tell you exactly what's missing.
-
-### PyPI (wheel + sdist)
-
-```bash
-make build          # build dist/*.whl and dist/*.tar.gz
-make check          # validate with twine
-make pypi           # upload to PyPI
-```
-
-### .deb Packages
-
-Build for a single distro or all four supported targets:
-
-```bash
-make deb DISTRO=ubuntu-jammy      # Ubuntu 22.04
-make deb DISTRO=ubuntu-noble      # Ubuntu 24.04
-make deb DISTRO=debian-bookworm   # Debian 12
-make deb DISTRO=kali              # Kali Rolling
-make deb                          # all four
-```
-
-Output lands in `dist/`:
-
-```
-dist/eip-search_0.2.0_ubuntu-jammy_all.deb
-dist/eip-search_0.2.0_ubuntu-noble_all.deb
-dist/eip-search_0.2.0_debian-bookworm_all.deb
-dist/eip-search_0.2.0_kali-rolling_all.deb
-```
-
-### Releasing
-
-**One-time setup:** add `PYPI_API_TOKEN` and `RELEASE_TOKEN` as repository secrets in Codeberg (Settings → Actions → Secrets).
-
-**Automated release (recommended)** — bumps version, commits, tags, and pushes. Forgejo Actions builds PyPI packages + all 4 `.deb`s, uploads to PyPI, and creates a Codeberg release with artifacts attached:
-
-```bash
-make tag-release VERSION=0.2.0
-```
-
-**Local release (alternative)** — does everything locally without CI:
-
-```bash
-make release VERSION=0.2.0
-```
-
-### Shell Completion (optional)
+## Shell Completion (optional)
 
 Enable tab completion for your shell (run from an interactive terminal):
 
@@ -207,17 +142,17 @@ eip-search --install-completion fish
 eip-search --install-completion powershell
 ```
 
-### Verify Installation
+## Verify Installation
 
 ```bash
 eip-search --version
-# eip-search 0.1.4
+# eip-search X.Y.Z
 
 eip-search stats
 # Should display platform statistics if your network can reach exploit-intel.com
 ```
 
-### Troubleshooting
+## Troubleshooting
 
 | Problem | Solution |
 |---|---|
@@ -587,7 +522,7 @@ Page 1/817 (4,082 total results)
 
 ## JSON Output for Scripting
 
-Every command supports `--json` for piping into `jq`, scripts, or SIEMs:
+Most data/query commands support `--json` for piping into `jq`, scripts, or SIEMs:
 
 ```
 $ eip-search search "log4j" --has-exploits --sort epss_desc -n 5 --json
@@ -620,6 +555,8 @@ eip-search search --kev --severity critical -n 100 --json | jq -r '.items[].cve_
 # Feed into nuclei
 eip-search search --has-nuclei --severity critical --json | jq -r '.items[].cve_id' | xargs -I{} nuclei -t {} -u https://target.com
 ```
+
+`--json` is currently available on: `search`, `info`, `triage`, `exploits`, `nuclei`, `stats`, `authors`, `author`, `cwes`, `cwe`, `vendors`, `products`, and `lookup`.
 
 ## Platform Statistics
 
@@ -778,7 +715,7 @@ eip-search --offline view CVE-2024-3400      # view exploit source code locally
 eip-search --offline download 77423 -x       # copy and extract local archive
 ```
 
-The archive contains ~22K repos (~28 GB). Both the database and archive are rebuilt 4x daily.
+The archive contains tens of thousands of repositories (tens of GB). Both the database and archive are refreshed multiple times daily.
 
 ## Search Filters
 
