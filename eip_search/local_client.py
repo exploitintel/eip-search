@@ -438,7 +438,7 @@ class LocalClient:
             id=v_id,
             cve_id=row["cve_id"],
             eip_id=row["eip_id"] or "",
-            status="published",
+            status=row["status"] or "published",
             title=row["title"],
             description=row["description"],
             cvss_v3_score=row["cvss_v3_score"],
@@ -478,26 +478,34 @@ class LocalClient:
         ).fetchone()
         last_updated = row[0] if row else None
 
+        _ACTIVE = "status NOT IN ('rejected','merged')"
+
+        # total_authors: prefer exploit_authors table, fall back for older DBs
+        try:
+            total_authors = _c("SELECT COUNT(*) FROM exploit_authors WHERE exploit_count > 0")
+        except sqlite3.OperationalError:
+            total_authors = _c("SELECT COUNT(DISTINCT author_name) FROM exploits WHERE author_name IS NOT NULL")
+
         return Stats(
-            total_vulns=_c("SELECT COUNT(*) FROM vulnerabilities"),
-            published=_c("SELECT COUNT(*) FROM vulnerabilities WHERE cve_id IS NOT NULL"),
-            with_title=_c("SELECT COUNT(*) FROM vulnerabilities WHERE title IS NOT NULL"),
-            with_cvss=_c("SELECT COUNT(*) FROM vulnerabilities WHERE cvss_v3_score IS NOT NULL"),
-            with_epss=_c("SELECT COUNT(*) FROM vulnerabilities WHERE epss_score IS NOT NULL"),
-            kev_total=_c("SELECT COUNT(*) FROM vulnerabilities WHERE is_kev = 1"),
-            vulncheck_kev_total=_c("SELECT COUNT(*) FROM vulnerabilities WHERE is_vulncheck_kev = 1"),
-            wild_total=_c("SELECT COUNT(*) FROM vulnerabilities WHERE is_exploited_wild = 1"),
-            ransomware_total=_c("SELECT COUNT(*) FROM vulnerabilities WHERE ransomware_use IS NOT NULL"),
+            total_vulns=_c(f"SELECT COUNT(*) FROM vulnerabilities WHERE {_ACTIVE}"),
+            published=_c("SELECT COUNT(*) FROM vulnerabilities WHERE status = 'published'"),
+            with_title=_c(f"SELECT COUNT(*) FROM vulnerabilities WHERE title IS NOT NULL AND {_ACTIVE}"),
+            with_cvss=_c(f"SELECT COUNT(*) FROM vulnerabilities WHERE cvss_v3_score IS NOT NULL AND {_ACTIVE}"),
+            with_epss=_c(f"SELECT COUNT(*) FROM vulnerabilities WHERE epss_score IS NOT NULL AND {_ACTIVE}"),
+            kev_total=_c(f"SELECT COUNT(*) FROM vulnerabilities WHERE is_kev = 1 AND {_ACTIVE}"),
+            vulncheck_kev_total=_c(f"SELECT COUNT(*) FROM vulnerabilities WHERE is_vulncheck_kev = 1 AND {_ACTIVE}"),
+            wild_total=_c(f"SELECT COUNT(*) FROM vulnerabilities WHERE is_exploited_wild = 1 AND {_ACTIVE}"),
+            ransomware_total=_c("SELECT COUNT(*) FROM vulnerabilities WHERE ransomware_use = 'Known'"),
             any_exploited_total=_c(
-                "SELECT COUNT(*) FROM vulnerabilities "
-                "WHERE is_kev = 1 OR is_vulncheck_kev = 1 OR is_exploited_wild = 1"
+                f"SELECT COUNT(*) FROM vulnerabilities "
+                f"WHERE (is_kev = 1 OR is_vulncheck_kev = 1 OR is_exploited_wild = 1) AND {_ACTIVE}"
             ),
-            critical_count=_c("SELECT COUNT(*) FROM vulnerabilities WHERE severity_label = 'critical'"),
-            with_nuclei=_c("SELECT COUNT(*) FROM vulnerabilities WHERE has_nuclei_template = 1"),
-            total_with_exploits=_c("SELECT COUNT(*) FROM vulnerabilities WHERE exploit_count > 0"),
+            critical_count=_c(f"SELECT COUNT(*) FROM vulnerabilities WHERE severity_label = 'critical' AND {_ACTIVE}"),
+            with_nuclei=_c(f"SELECT COUNT(*) FROM vulnerabilities WHERE has_nuclei_template = 1 AND {_ACTIVE}"),
+            total_with_exploits=_c(f"SELECT COUNT(*) FROM vulnerabilities WHERE exploit_count > 0 AND {_ACTIVE}"),
             total_exploits=_c("SELECT COUNT(*) FROM exploits WHERE source != 'writeup'"),
             total_vendors=_c("SELECT COUNT(DISTINCT vendor) FROM affected_products WHERE vendor IS NOT NULL"),
-            total_authors=_c("SELECT COUNT(DISTINCT author_name) FROM exploits WHERE author_name IS NOT NULL"),
+            total_authors=total_authors,
             last_updated=last_updated,
         )
 
