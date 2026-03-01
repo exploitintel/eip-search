@@ -92,22 +92,34 @@ class LocalClient:
             conditions.append("v.severity_label = ?")
             binds.append(clean["severity"].lower())
 
-        if clean.get("is_kev"):
+        if clean.get("is_kev") is True:
             conditions.append("v.is_kev = 1")
+        elif clean.get("is_kev") is False:
+            conditions.append("IFNULL(v.is_kev, 0) = 0")
 
-        if clean.get("any_exploited"):
+        if clean.get("any_exploited") is True:
             conditions.append(
                 "(v.is_kev = 1 OR v.is_vulncheck_kev = 1 OR v.is_exploited_wild = 1)"
             )
+        elif clean.get("any_exploited") is False:
+            conditions.append(
+                "(IFNULL(v.is_kev, 0) = 0 AND IFNULL(v.is_vulncheck_kev, 0) = 0 AND IFNULL(v.is_exploited_wild, 0) = 0)"
+            )
 
-        if clean.get("ransomware"):
-            conditions.append("v.ransomware_use IS NOT NULL")
+        if clean.get("ransomware") is True:
+            conditions.append("v.ransomware_use = 'Known'")
+        elif clean.get("ransomware") is False:
+            conditions.append("(v.ransomware_use IS NULL OR v.ransomware_use != 'Known')")
 
-        if clean.get("has_exploits"):
+        if clean.get("has_exploits") is True:
             conditions.append("v.exploit_count > 0")
+        elif clean.get("has_exploits") is False:
+            conditions.append("IFNULL(v.exploit_count, 0) = 0")
 
-        if clean.get("has_nuclei"):
+        if clean.get("has_nuclei") is True:
             conditions.append("v.has_nuclei_template = 1")
+        elif clean.get("has_nuclei") is False:
+            conditions.append("IFNULL(v.has_nuclei_template, 0) = 0")
 
         need_ap = any(k in clean for k in ("vendor", "product", "ecosystem"))
         if need_ap:
@@ -237,8 +249,10 @@ class LocalClient:
             conditions.append("e.github_stars >= ?")
             binds.append(int(clean["min_stars"]))
 
-        if clean.get("has_code"):
+        if clean.get("has_code") is True:
             conditions.append("e.has_code = 1")
+        elif clean.get("has_code") is False:
+            conditions.append("IFNULL(e.has_code, 0) = 0")
 
         if clean.get("cve"):
             conditions.append("v.cve_id = ?")
