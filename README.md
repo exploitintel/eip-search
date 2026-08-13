@@ -55,8 +55,7 @@ docker run --rm \
   --security-opt no-new-privileges \
   --user "$(id -u):$(id -g)" \
   -v "$PWD:/work" \
-  eip-search \
-  stix vuln CVE-2024-3400 --output cve.json
+  eip-search stix vuln CVE-2024-3400 --output docker-cve.json
 ```
 
 ## Try it
