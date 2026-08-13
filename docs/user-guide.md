@@ -23,6 +23,32 @@ pipx upgrade eip-search
 pipx uninstall eip-search
 ```
 
+### Docker
+
+To use the CLI without installing Python locally, build the image from a source
+checkout:
+
+```sh
+docker build -t eip-search .
+docker run --rm eip-search --version
+docker run --rm eip-search CVE-2024-3400
+```
+
+The image runs as an unprivileged user and uses `/work` as its working
+directory. Mount a writable host directory when saving downloads, screenshots,
+or STIX bundles:
+
+```sh
+docker run --rm \
+  --read-only \
+  --cap-drop ALL \
+  --security-opt no-new-privileges \
+  --user "$(id -u):$(id -g)" \
+  -v "$PWD:/work" \
+  eip-search \
+  stix vuln CVE-2024-3400 --output cve.json
+```
+
 ## First connection
 
 Verify the default public API and its required subsystems:

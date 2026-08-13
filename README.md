@@ -36,6 +36,29 @@ eip-search doctor
 
 Upgrade later with `pipx upgrade eip-search`.
 
+### Docker alternative
+
+Build the image directly from this checkout:
+
+```sh
+docker build -t eip-search .
+docker run --rm eip-search CVE-2024-3400
+```
+
+Mount the current directory when a command needs to save a download,
+screenshot, or STIX bundle:
+
+```sh
+docker run --rm \
+  --read-only \
+  --cap-drop ALL \
+  --security-opt no-new-privileges \
+  --user "$(id -u):$(id -g)" \
+  -v "$PWD:/work" \
+  eip-search \
+  stix vuln CVE-2024-3400 --output cve.json
+```
+
 ## Try it
 
 Search vulnerabilities or open one directly:
