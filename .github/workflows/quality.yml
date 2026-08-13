@@ -1,0 +1,168 @@
+name: quality
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.14"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Enforce ASCII dash typography
+        run: |
+          if git grep -n -I -P '[\x{2013}\x{2014}]' -- .; then
+            echo "Use an ASCII hyphen instead of an en dash or em dash." >&2
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements-dev.txt
+          python -m pip install -e .
+
+      - name: Ruff
+        run: ruff check src tests
+
+      - name: Pytest
+        run: >-
+          python -m pytest -q
+          --cov=eip_search_v3 --cov-report=term-missing --cov-fail-under=90
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Enforce ASCII dash typography
+        run: |
+          if git grep -n -I -P '[\x{2013}\x{2014}]' -- .; then
+            echo "Use an ASCII hyphen instead of an en dash or em dash." >&2
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Build distributions
+        run: |
+          python -m pip install "build>=1.2,<2" "twine>=6,<7"
+          python -m build
+
+      - name: Validate distributions
+        run: python -m twine check dist/*
+
+      - name: Install wheel in a clean environment
+        run: |
+          python -m venv /tmp/eip-search-wheel-check
+          /tmp/eip-search-wheel-check/bin/python -m pip install dist/*.whl
+          /tmp/eip-search-wheel-check/bin/eip-search --version
+          /tmp/eip-search-wheel-check/bin/eip-search --help
+          /tmp/eip-search-wheel-check/bin/python - <<'PY'
+          from importlib.metadata import version
+          import eip_search_v3
+
+          assert version("eip-search") == eip_search_v3.__version__
+          PY
+
+      - name: Install sdist in a clean environment
+        run: |
+          python -m venv /tmp/eip-search-sdist-check
+          /tmp/eip-search-sdist-check/bin/python -m pip install dist/*.tar.gz
+          /tmp/eip-search-sdist-check/bin/python -m pip check
+          /tmp/eip-search-sdist-check/bin/eip-search --version
+          /tmp/eip-search-sdist-check/bin/eip-search --help
+
+      - name: Check release files
+        run: |
+          python - <<'PY'
+          import pathlib
+          import tarfile
+          import zipfile
+
+          wheel = next(pathlib.Path("dist").glob("*.whl"))
+          sdist = next(pathlib.Path("dist").glob("*.tar.gz"))
+          with zipfile.ZipFile(wheel) as archive:
+              assert any(name.endswith("/licenses/LICENSE") for name in archive.namelist())
+              assert any(name.endswith("/METADATA") for name in archive.namelist())
+          with tarfile.open(sdist) as archive:
+              names = archive.getnames()
+              assert any(name.endswith("/LICENSE") for name in names)
+              assert any(name.endswith("/SECURITY.md") for name in names)
+              assert any(name.endswith("/CONTRIBUTING.md") for name in names)
+              assert any(name.endswith("/tests/conftest.py") for name in names)
+              assert any(name.endswith("/tests/test_rendering.py") for name in names)
+              assert any(name.endswith("/docs/user-guide.md") for name in names)
+          PY
+
+      - name: Verify minimum supported Typer
+        run: |
+          python -m venv /tmp/eip-search-min-typer
+          /tmp/eip-search-min-typer/bin/python -m pip install \
+            "typer==0.18.0" dist/*.whl
+          /tmp/eip-search-min-typer/bin/python -m pip check
+          /tmp/eip-search-min-typer/bin/python - <<'PY'
+          import subprocess
+
+          executable = "/tmp/eip-search-min-typer/bin/eip-search"
+          help_result = subprocess.run(
+              [executable, "--help"], capture_output=True, text=True, check=False
+          )
+          assert help_result.returncode == 0, help_result.stderr
+          assert "EIP // EXPLOIT INTEL" in help_result.stdout
+          assert "eip-search code 'subprocess.run('" in help_result.stdout
+
+          code_help_result = subprocess.run(
+              [executable, "code"], capture_output=True, text=True, check=False
+          )
+          assert code_help_result.returncode == 0, code_help_result.stderr
+          assert "Example: eip-search code 'subprocess.run('" in code_help_result.stdout
+
+          for optional_query_help in (
+              [executable, "vendor", "--help"],
+              [executable, "vuln", "search", "--help"],
+              [executable, "product", "--help"],
+          ):
+              optional_result = subprocess.run(
+                  optional_query_help, capture_output=True, text=True, check=False
+              )
+              assert optional_result.returncode == 0, optional_result.stderr
+              assert "[QUERY]" in optional_result.stdout
+
+          short_query_result = subprocess.run(
+              [executable, "code", "x"], capture_output=True, text=True, check=False
+          )
+          assert short_query_result.returncode == 2
+          assert "between 2 and 200 characters" in (
+              short_query_result.stdout + short_query_result.stderr
+          )
+
+          missing_result = subprocess.run(
+              [executable, "exploit", "view", "123"],
+              capture_output=True,
+              text=True,
+              check=False,
+          )
+          output = missing_result.stdout + missing_result.stderr
+          assert missing_result.returncode == 2, output
+          assert "missing argument" in output.lower()
+          assert "path" in output.lower()
+          PY
