@@ -1,4 +1,4 @@
-# eip-search-v3
+# eip-search
 
 ## Boundary
 
