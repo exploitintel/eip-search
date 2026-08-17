@@ -35,13 +35,13 @@ The public source repository, distribution, and executable are all
 authorization.
 
 ```sh
-python3 -m venv .venv
+python3 -m venv --clear .venv   # --clear: a uv-made .venv has no pip
 . .venv/bin/activate
 python -m pip install -r requirements-dev.txt
 python -m pip install -e .
 ruff check src tests
 pytest -q -m 'not live' --cov=eip_search_v3 --cov-fail-under=90
-! git grep -n -I -P '[\x{2013}\x{2014}]' -- .   # CI rejects en/em dashes
+! git grep --untracked -n -I -P '[\x{2013}\x{2014}]' -- .   # CI rejects en/em dashes
 ```
 
 CI enforces that dash check, the coverage floor, and a packaging job that
@@ -55,6 +55,31 @@ review API.
 User-visible behavior belongs in `docs/user-guide.md`; keep the README concise,
 user-first, and suitable for both GitHub and PyPI rendering. The project uses
 the MIT License and GitHub private vulnerability reporting.
+
+## Layout
+
+- `cli.py` - every Typer command, and the only place option parsing lives.
+- `client.py` - the sole HTTP caller. Nothing else talks to the API.
+- `config.py` - configuration loading (see below).
+- `safety.py` - terminal and filesystem containment for hostile corpus values.
+  Untrusted text passes through here before it reaches the terminal.
+- `render/` - one module per domain: `vulnerability`, `exploit`, `labs`,
+  `discovery`, `system`, plus shared helpers in `common`.
+- `errors.py` - the exit-code hierarchy documented in the user guide.
+
+## Configuration
+
+Precedence, highest first: CLI option where one exists, environment variable,
+configuration file, built-in default. The variables are `EIP_API_BASE_URL`,
+`EIP_SEARCH_CONFIG`, `EIP_SEARCH_TIMEOUT_SECONDS`, and
+`EIP_SEARCH_MAX_DOWNLOAD_BYTES`; the last has no CLI option.
+`XDG_CONFIG_HOME` locates the configuration file when `EIP_SEARCH_CONFIG` is
+unset. `NO_COLOR` disables styling, as does `--no-color`.
+
+Python 3.12 or newer is required, and CI runs the suite on 3.12 and 3.14, so a
+green single-interpreter run locally is not proof.
+
+## Working in this repository
 
 Work on a short-lived topic branch named `feat/`, `fix/`, `chore/`, `docs/`, or
 `agent/` plus a short slug, and open a pull request; never commit to `main`.
