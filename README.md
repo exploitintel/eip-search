@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://exploit-intel.com">
-    <img src="docs/assets/eip-hero-banner.svg" alt="Exploit Intelligence Platform" width="100%">
+    <img src="https://raw.githubusercontent.com/exploitintel/eip-search/main/docs/assets/eip-hero-banner.svg" alt="Exploit Intelligence Platform" width="100%">
   </a>
 </p>
 
@@ -126,8 +126,9 @@ configuration file at `~/.config/eip-search/config.toml` or
 - Corpus text and source code are treated as hostile terminal input.
 - PoC file and download access uses fresh, short-lived tokens that are never
   printed or retained.
-- Downloads remain password-protected ZIP archives; the CLI never extracts or
-  executes them.
+- Downloads remain AES-encrypted ZIP archives with password `eip`. AES entries
+  need an AES-capable tool such as 7-Zip rather than the stock `unzip`; the CLI
+  never extracts or executes them.
 - Stored analysis is attributed model interpretation, not an EIP verdict.
 - Missing analysis never means that an artifact was reviewed and found safe.
 
