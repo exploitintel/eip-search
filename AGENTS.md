@@ -21,8 +21,8 @@ no code from another EIP repository.
   escape Rich markup, and keep output bounded.
 - PoC file and download access uses fresh short-lived POST tokens. Tokens must
   never enter output, logs, tracebacks, configuration, or retained state.
-- Downloads remain password-protected ZIP archives and are never extracted or
-  executed by this tool.
+- Downloads remain AES-encrypted ZIP archives (password `eip`) and are never
+  extracted or executed by this tool.
 - No client-side page filtering or sorting. Add missing global predicates to
   the API in a separate slice rather than returning misleading partial results.
 - No offline database until EIP publishes an upstream-owned versioned export.
@@ -40,8 +40,13 @@ python3 -m venv .venv
 python -m pip install -r requirements-dev.txt
 python -m pip install -e .
 ruff check src tests
-pytest -q
+pytest -q -m 'not live' --cov=eip_search_v3 --cov-fail-under=90
+! git grep -n -I -P '[\x{2013}\x{2014}]' -- .   # CI rejects en/em dashes
 ```
+
+CI enforces that dash check, the coverage floor, and a packaging job that
+asserts CLI help text and examples, so changing a banner or an example string
+can fail the build. `CONTRIBUTING.md` carries the full local suite.
 
 Live tests require `EIP_SEARCH_TEST_API_BASE_URL` and must verify parameter
 effects, not merely HTTP success. Keep them bounded and courteous to the shared
@@ -51,6 +56,7 @@ User-visible behavior belongs in `docs/user-guide.md`; keep the README concise,
 user-first, and suitable for both GitHub and PyPI rendering. The project uses
 the MIT License and GitHub private vulnerability reporting.
 
-Use short-lived `agent/*` branches and pull requests. Inspect status and preserve
-unrelated work before editing. Commits, PRs, merges, package publication, and
-deployment require operator authorization.
+Work on a short-lived topic branch named `feat/`, `fix/`, `chore/`, `docs/`, or
+`agent/` plus a short slug, and open a pull request; never commit to `main`.
+Inspect status and preserve unrelated work before editing. Commits, PRs,
+merges, package publication, and deployment require operator authorization.

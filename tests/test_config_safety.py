@@ -65,8 +65,8 @@ def test_explicit_empty_base_url_does_not_silently_use_a_default() -> None:
     [
         ("http://localhost:8000/", "http://localhost:8000"),
         ("http://api.localhost/v1/", "http://api.localhost/v1"),
-        ("http://127.0.0.1:13002/", "http://127.0.0.1:13002"),
-        ("http://[::1]:13002/", "http://[::1]:13002"),
+        ("http://127.0.0.1:8001/", "http://127.0.0.1:8001"),
+        ("http://[::1]:8001/", "http://[::1]:8001"),
     ],
 )
 def test_loopback_http_base_urls_are_allowed(value: str, expected: str) -> None:

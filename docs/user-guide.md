@@ -73,13 +73,14 @@ set `EIP_SEARCH_CONFIG` to select an exact file. A complete configuration is:
 
 ```toml
 [api]
+base_url = "https://exploit-intel.com"
 timeout_seconds = 30
 max_download_bytes = 104857600
 ```
 
 Configuration precedence, highest first:
 
-1. CLI options such as `--timeout`
+1. CLI options such as `--timeout` and `--api-base-url`
 2. Environment variables
 3. The configuration file
 4. Built-in defaults
@@ -88,6 +89,7 @@ Supported environment variables:
 
 | Variable | Purpose |
 | --- | --- |
+| `EIP_API_BASE_URL` | API origin the client talks to; outranks the configuration file |
 | `EIP_SEARCH_TIMEOUT_SECONDS` | Request timeout from 1 to 900 seconds |
 | `EIP_SEARCH_MAX_DOWNLOAD_BYTES` | Maximum protected download size, from 1 MiB to 1 GiB |
 | `EIP_SEARCH_CONFIG` | Exact configuration-file path |
@@ -122,7 +124,7 @@ eip-search vuln search --cisa-kev --sort epss --limit 20
 
 Package names require an exact ecosystem. Vendor, product, ecosystem, package,
 and CWE values remain source-native. `--with-artifacts` means the API's
-`artifact_count > 0`; it is not presented as a “has PoC” predicate.
+`artifact_count > 0`; it is not presented as a "has PoC" predicate.
 
 Vulnerability detail includes exploitation context, affected ranges, PoCs,
 Nuclei, labs, references, and accepted research resources when present:
@@ -174,10 +176,12 @@ eip-search exploit download 8700882207674114 --output poc.zip
 
 File viewing and downloads request a fresh short-lived POST token for each
 operation. Tokens are never printed or retained. Downloads remain
-password-protected ZIP archives with password `eip`; the CLI never extracts or
-executes them. Without `--output`, the archive is written to the current working
-directory using the API-suggested safe filename. Existing files are not
-overwritten unless `--force` is passed.
+AES-encrypted ZIP archives with password `eip`; the CLI never extracts or
+executes them. AES zip entries are not readable by the stock `unzip`, which
+reports an unsupported compression method: use 7-Zip (`7z x -peip poc.zip`) or
+another AES-capable tool. Without `--output`, the archive is written to the
+current working directory using the API-suggested safe filename. Existing
+files are not overwritten unless `--force` is passed.
 
 ## Code search
 
@@ -273,7 +277,7 @@ Diagnostics go to stderr.
 
 ```sh
 eip-search vuln search apache --limit 10 --json >results.json
-eip-search exploit show 8700882207674114 --json | jq '.poc.public_id'
+eip-search exploit show 8700882207674114 --json | jq '.public_id'
 ```
 
 API field names, nulls, arrays, provenance, and cursors are preserved rather
@@ -294,6 +298,7 @@ eip-search --install-completion
 | Status | Meaning |
 | ---: | --- |
 | `0` | Success, including a valid empty search |
+| `1` | Unexpected internal error |
 | `2` | Invalid CLI input or API validation rejection |
 | `3` | Detail record not found |
 | `4` | API or required subsystem unavailable |
