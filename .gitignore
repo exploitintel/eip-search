@@ -10,3 +10,5 @@ build/
 *.egg-info/
 .env
 .env.local
+.mypy_cache/
+mypy.log

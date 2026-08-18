@@ -40,6 +40,38 @@ eip-search = "eip_search_v3.cli:entrypoint"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.mypy]
+python_version = "3.12"
+files = ["src"]
+ignore_missing_imports = true
+# Report an override that matches nothing, so an exemption cannot outlive the
+# errors it was added for. mypy prints that as a note and still exits 0, so the
+# CI step greps for it and fails.
+warn_unused_configs = true
+
+# Type checking is a ratchet, not an allowlist. Everything is checked by default
+# and the exemptions are listed, never the inverse. Listing what IS checked would
+# leave every new module unchecked by default, so debt would accumulate silently
+# and the list would be the same size in a year. This way new code is checked
+# without anyone deciding to check it, and the list below can only shrink.
+#
+# 7 of 14 modules are exempt, holding 22 errors: cli, client, config, render.common, render.exploit, render.labs, render.vulnerability.
+# Most are one shape: a corpus lookup that may return None, then read with .get
+# in the renderers. Fixing that properly means giving the lookup a precise return
+# type, which is worth doing deliberately rather than inside a tooling change.
+# Removing a module from this list plus fixing its errors is the unit of progress.
+[[tool.mypy.overrides]]
+module = [
+    "eip_search_v3.cli",
+    "eip_search_v3.client",
+    "eip_search_v3.config",
+    "eip_search_v3.render.common",
+    "eip_search_v3.render.exploit",
+    "eip_search_v3.render.labs",
+    "eip_search_v3.render.vulnerability",
+]
+ignore_errors = true
+
 [tool.ruff]
 # Pin the formatter to the version CI installs. `ruff check` findings are stable
 # across releases; `ruff format` output is not, and AGENTS.md tells a maintainer
