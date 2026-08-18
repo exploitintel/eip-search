@@ -39,6 +39,9 @@ jobs:
       - name: Ruff
         run: ruff check src tests
 
+      - name: Ruff format
+        run: ruff format --check src tests
+
       - name: Pytest
         run: >-
           python -m pytest -q
