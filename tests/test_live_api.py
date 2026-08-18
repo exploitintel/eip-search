@@ -217,9 +217,7 @@ def test_code_search_exact_scopes_hold_against_authoritative_membership(
             }
             if candidate["public_id"] not in authoritative_ids:
                 continue
-            scoped = live.code_search(
-                {"q": "http", "vulnerability_id": identifier, "limit": 1}
-            )
+            scoped = live.code_search({"q": "http", "vulnerability_id": identifier, "limit": 1})
             scoped_rows = rows(scoped)
             if not scoped_rows:
                 continue

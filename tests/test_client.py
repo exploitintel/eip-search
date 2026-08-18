@@ -260,7 +260,7 @@ def test_total_deadline_stops_a_dripping_response(monkeypatch) -> None:
 
     class Drip(httpx.SyncByteStream):
         def __iter__(self):
-            for chunk in (b'{"', b'ok', b'":true}'):
+            for chunk in (b'{"', b"ok", b'":true}'):
                 clock[0] += 1.0
                 yield chunk
 
