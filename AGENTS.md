@@ -40,6 +40,8 @@ python3 -m venv --clear .venv   # --clear: a uv-made .venv has no pip
 python -m pip install -r requirements-dev.txt
 python -m pip install -e .
 ruff check src tests
+ruff format --check src tests
+mypy
 pytest -q -m 'not live' --cov=eip_search_v3 --cov-fail-under=90
 ! git grep --untracked -n -I -P '[\x{2013}\x{2014}]' -- .   # CI rejects en/em dashes
 ```
