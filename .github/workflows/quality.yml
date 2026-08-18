@@ -42,6 +42,15 @@ jobs:
       - name: Ruff format
         run: ruff format --check src tests
 
+      - name: Mypy
+        run: |
+          set -o pipefail
+          mypy 2>&1 | tee mypy.log
+          if grep -q 'unused section' mypy.log; then
+            echo "::error::A mypy exemption in pyproject.toml matches nothing. Remove it."
+            exit 1
+          fi
+
       - name: Pytest
         run: >-
           python -m pytest -q
