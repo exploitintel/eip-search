@@ -567,9 +567,7 @@ class EipClient:
                     retryable=False,
                     stream=True,
                 )
-                if "application/zip" not in response.headers.get(
-                    "Content-Type", ""
-                ).lower():
+                if "application/zip" not in response.headers.get("Content-Type", "").lower():
                     raise UnavailableError("EIP API returned an unexpected download content type")
                 filename = _suggested_filename(response, "eip-poc.zip", secret=token)
                 destination = output or Path.cwd() / filename

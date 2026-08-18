@@ -41,6 +41,12 @@ eip-search = "eip_search_v3.cli:entrypoint"
 where = ["src"]
 
 [tool.ruff]
+# Pin the formatter to the version CI installs. `ruff check` findings are stable
+# across releases; `ruff format` output is not, and AGENTS.md tells a maintainer
+# to run these commands directly, so whatever ruff is on PATH would be used.
+# ruff refuses to run on a mismatch rather than producing a different diff.
+required-version = "==0.16.3"
+
 line-length = 100
 src = ["src", "tests"]
 

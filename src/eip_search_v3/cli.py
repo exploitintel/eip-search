@@ -393,9 +393,7 @@ def _identifier(value: str) -> str:
 @vuln_app.command("search")
 def vuln_search(
     ctx: typer.Context,
-    query: Annotated[
-        str | None, typer.Argument(help="Full-text vulnerability query.")
-    ] = None,
+    query: Annotated[str | None, typer.Argument(help="Full-text vulnerability query.")] = None,
     severity: Annotated[
         list[Severity] | None,
         typer.Option("--severity", "-s", help="Repeat to include CVSS severities."),
@@ -536,6 +534,7 @@ def vuln_nuclei(
 
     Example: eip-search vuln nuclei CVE-2024-3400
     """
+
     def render(console: Console, payload: dict[str, Any]) -> None:
         render_nuclei(console, payload.get("nuclei_templates"), limit=limit)
 
@@ -623,9 +622,7 @@ def exploit_show(
     ctx: typer.Context,
     identity: Annotated[
         str,
-        typer.Argument(
-            metavar="IDENTITY", help="Stable numeric public ID or API artifact ID."
-        ),
+        typer.Argument(metavar="IDENTITY", help="Stable numeric public ID or API artifact ID."),
     ],
     no_analysis: Annotated[
         bool, typer.Option("--no-analysis", help="Omit stored model interpretation.")
@@ -651,9 +648,7 @@ def exploit_analysis(
     ctx: typer.Context,
     identity: Annotated[
         str,
-        typer.Argument(
-            metavar="IDENTITY", help="Stable numeric public ID or API artifact ID."
-        ),
+        typer.Argument(metavar="IDENTITY", help="Stable numeric public ID or API artifact ID."),
     ],
     output_json: Annotated[bool, typer.Option("--json", "-j", help=_JSON_HELP)] = False,
 ) -> None:
@@ -661,6 +656,7 @@ def exploit_analysis(
 
     Example: eip-search exploit analysis 8700882207674114
     """
+
     def request(client: EipClient) -> dict[str, Any]:
         payload = client.poc(identity)
         return {"artifact_id": payload.get("artifact_id"), "analysis": payload.get("analysis")}
@@ -678,9 +674,7 @@ def exploit_files(
     ctx: typer.Context,
     identity: Annotated[
         str,
-        typer.Argument(
-            metavar="IDENTITY", help="Stable numeric public ID or API artifact ID."
-        ),
+        typer.Argument(metavar="IDENTITY", help="Stable numeric public ID or API artifact ID."),
     ],
     output_json: Annotated[bool, typer.Option("--json", "-j", help=_JSON_HELP)] = False,
 ) -> None:
@@ -698,9 +692,7 @@ def exploit_view(
     ctx: typer.Context,
     identity: Annotated[
         str,
-        typer.Argument(
-            metavar="IDENTITY", help="Stable numeric public ID or API artifact ID."
-        ),
+        typer.Argument(metavar="IDENTITY", help="Stable numeric public ID or API artifact ID."),
     ],
     path: Annotated[
         str, typer.Argument(metavar="PATH", help="Exact path returned by `exploit files`.")
@@ -727,9 +719,7 @@ def exploit_download(
     ctx: typer.Context,
     identity: Annotated[
         str,
-        typer.Argument(
-            metavar="IDENTITY", help="Stable numeric public ID or API artifact ID."
-        ),
+        typer.Argument(metavar="IDENTITY", help="Stable numeric public ID or API artifact ID."),
     ],
     output: Annotated[
         Path | None, typer.Option("--output", "-o", help="Destination ZIP path.")
@@ -743,6 +733,7 @@ def exploit_download(
 
     Example: eip-search exploit download 8700882207674114 --output poc.zip
     """
+
     def render(console: Console, payload: dict[str, Any]) -> None:
         console.print(
             Text(
@@ -793,9 +784,7 @@ def code_search(
             help="Search only PoCs associated with this vulnerability identifier.",
         ),
     ] = None,
-    limit: Annotated[
-        int, typer.Option("--limit", "-n", min=1, max=50, help=_PAGE_LIMIT_HELP)
-    ] = 25,
+    limit: Annotated[int, typer.Option("--limit", "-n", min=1, max=50, help=_PAGE_LIMIT_HELP)] = 25,
     cursor: Annotated[str | None, typer.Option("--cursor", help=_CURSOR_HELP)] = None,
     output_json: Annotated[bool, typer.Option("--json", "-j", help=_JSON_HELP)] = False,
 ) -> None:
@@ -881,9 +870,7 @@ def lab_screenshot(
     public_id: Annotated[
         int, typer.Argument(metavar="PUBLIC-ID", help="Stable numeric lab public ID.")
     ],
-    output: Annotated[
-        Path, typer.Option("--output", "-o", help="Destination image path.")
-    ],
+    output: Annotated[Path, typer.Option("--output", "-o", help="Destination image path.")],
     force: Annotated[
         bool, typer.Option("--force", help="Replace an existing destination file.")
     ] = False,
@@ -933,9 +920,7 @@ def _directory_command(
 @app.command("vendor")
 def vendor_list(
     ctx: typer.Context,
-    query: Annotated[
-        str | None, typer.Argument(help="Optional vendor-name substring.")
-    ] = None,
+    query: Annotated[str | None, typer.Argument(help="Optional vendor-name substring.")] = None,
     limit: Annotated[
         int, typer.Option("--limit", "-n", min=1, max=100, help=_PAGE_LIMIT_HELP)
     ] = 25,
@@ -955,9 +940,7 @@ def vendor_list(
 def product_list(
     ctx: typer.Context,
     vendor: Annotated[str, typer.Option("--vendor", help="Exact source-native vendor name.")],
-    query: Annotated[
-        str | None, typer.Argument(help="Optional product-name substring.")
-    ] = None,
+    query: Annotated[str | None, typer.Argument(help="Optional product-name substring.")] = None,
     limit: Annotated[
         int, typer.Option("--limit", "-n", min=1, max=100, help=_PAGE_LIMIT_HELP)
     ] = 25,
@@ -982,9 +965,7 @@ def product_list(
 @app.command("ecosystem")
 def ecosystem_list(
     ctx: typer.Context,
-    query: Annotated[
-        str | None, typer.Argument(help="Optional ecosystem-name substring.")
-    ] = None,
+    query: Annotated[str | None, typer.Argument(help="Optional ecosystem-name substring.")] = None,
     limit: Annotated[
         int, typer.Option("--limit", "-n", min=1, max=100, help=_PAGE_LIMIT_HELP)
     ] = 25,
@@ -1004,9 +985,7 @@ def ecosystem_list(
 def package_list(
     ctx: typer.Context,
     ecosystem: Annotated[str, typer.Option("--ecosystem", help="Exact package ecosystem.")],
-    query: Annotated[
-        str | None, typer.Argument(help="Optional package-name substring.")
-    ] = None,
+    query: Annotated[str | None, typer.Argument(help="Optional package-name substring.")] = None,
     limit: Annotated[
         int, typer.Option("--limit", "-n", min=1, max=100, help=_PAGE_LIMIT_HELP)
     ] = 25,
@@ -1031,9 +1010,7 @@ def package_list(
 @cwe_app.command("list")
 def cwe_list(
     ctx: typer.Context,
-    query: Annotated[
-        str | None, typer.Argument(help="Optional CWE ID or name substring.")
-    ] = None,
+    query: Annotated[str | None, typer.Argument(help="Optional CWE ID or name substring.")] = None,
     limit: Annotated[
         int, typer.Option("--limit", "-n", min=1, max=100, help=_PAGE_LIMIT_HELP)
     ] = 25,
@@ -1178,6 +1155,7 @@ def stats(
 
     Example: eip-search stats --trends all
     """
+
     def request(client: EipClient) -> dict[str, Any]:
         totals = client.statistics()
         if trends == Trend.none:
@@ -1191,9 +1169,7 @@ def stats(
                 Trend.poc_supply: "poc_supply",
             }[trends]
             trend_payload = {
-                key: value
-                for key, value in trend_payload.items()
-                if key in {"as_of", field}
+                key: value for key, value in trend_payload.items() if key in {"as_of", field}
             }
         return {"statistics": totals, "trends": trend_payload}
 

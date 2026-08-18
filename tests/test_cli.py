@@ -177,9 +177,7 @@ def test_code_search_scope_is_forwarded_without_client_side_derivation(
 
 
 @pytest.mark.parametrize("query", ["变量", "привет", "１２３"])
-def test_code_search_accepts_unicode_word_terms(
-    runner: CliRunner, fake_api, query: str
-) -> None:
+def test_code_search_accepts_unicode_word_terms(runner: CliRunner, fake_api, query: str) -> None:
     result = runner.invoke(cli.app, ["code", query, "--json"])
     assert result.exit_code == 0, result.output
     assert fake_api.instances[-1].calls[-1] == (
