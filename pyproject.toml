@@ -44,9 +44,11 @@ where = ["src"]
 python_version = "3.12"
 files = ["src"]
 ignore_missing_imports = true
-# Report an override that matches nothing, so an exemption cannot outlive the
-# errors it was added for. mypy prints that as a note and still exits 0, so the
-# CI step greps for it and fails.
+# Report an override that names a module mypy never processes, so a renamed or
+# deleted entry cannot linger. mypy prints that as a note and still exits 0, so
+# the CI step greps for it and fails. Note the limit: this does NOT catch a
+# module whose errors were fixed but whose exemption stayed, because the module
+# still exists and is still processed.
 warn_unused_configs = true
 
 # Type checking is a ratchet, not an allowlist. Everything is checked by default
