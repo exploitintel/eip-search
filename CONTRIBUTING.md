@@ -23,7 +23,7 @@ Run the local quality suite before opening a pull request:
 ```sh
 ! git grep -n -I -P '[\x{2013}\x{2014}]' -- .   # CI rejects en/em dashes
 ruff check src tests
-pytest -q -m 'not live' --cov=eip_search_v3 --cov-fail-under=90
+pytest -q -m 'not live' --cov=eip_search_v3 --cov-fail-under=92
 python -m build
 python -m twine check dist/*
 ```

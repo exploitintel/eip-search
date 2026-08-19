@@ -54,7 +54,7 @@ jobs:
       - name: Pytest
         run: >-
           python -m pytest -q
-          --cov=eip_search_v3 --cov-report=term-missing --cov-fail-under=90
+          --cov=eip_search_v3 --cov-report=term-missing --cov-fail-under=92
 
   package:
     runs-on: ubuntu-latest

@@ -42,9 +42,15 @@ python -m pip install -e .
 ruff check src tests
 ruff format --check src tests
 mypy
-pytest -q -m 'not live' --cov=eip_search_v3 --cov-fail-under=90
+pytest -q -m 'not live' --cov=eip_search_v3 --cov-fail-under=92
 ! git grep --untracked -n -I -P '[\x{2013}\x{2014}]' -- .   # CI rejects en/em dashes
 ```
+
+Run that with a narrow or unset `COLUMNS`. Rich sizes its output to the terminal,
+so a wide terminal executes render branches a narrow one does not: this suite
+reports 93 percent unset or at 80 columns and 95 percent at 140. CI has no tty and
+sees 93, so a wide local terminal will suggest roughly twice the headroom that
+actually exists.
 
 CI enforces that dash check, the coverage floor, and a packaging job that
 asserts CLI help text and examples, so changing a banner or an example string
